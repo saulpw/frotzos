@@ -50,9 +50,12 @@ success:
 
     mov al, 'O'
     call putc
-    mov al, 'K'
-    call putc
-    hlt
+
+    lgdt [cs:GDT]
+    mov eax, cr0
+    or al, 1
+    mov cr0, eax
+    jmp 0x08:protmain
 
 ;[in AX=LBA Sector]
 ;[out DX,CX]
@@ -92,6 +95,29 @@ reset:
     jc error
     ret
 
+GDT   dw 0xffff         ; limit
+      dd GDT            ; offset
+      dw 0
+       ; 0xBBBBLLLL, 0xBBFLAABB    ; F = GS00b, AA = 1001XDW0
+gdtCS dd 0x0000ffff, 0x00CF9A00    ; 0x08h
+gdtDS dd 0x0000ffff, 0x00CF9200    ; 0x10h
+
+protmain:
+[bits 32]
+    mov ax, 0x10
+    mov ds, ax
+    mov ss, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    mov esp, 0x6000      ; data stack grows down
+
+    jmp 0x8000
+
     times (512 - $ + entry - 2) db 0 ; pad boot sector with zeroes
     db 0x55, 0xAA ; 2 byte boot signature
 
+    mov edi, 0xb8002
+    mov dword [edi], 'K > '
+    hlt
