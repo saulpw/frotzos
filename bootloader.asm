@@ -1,5 +1,7 @@
 ; compile with nasm, use as floppy image to Virtualbox
 
+%define DEBUG 0
+
 [BITS 16]
 [ORG 0x7c00]
 
@@ -30,14 +32,18 @@ nextsector:
     mov ax, 0x0201      ; function 13h/02, read 01 sectors
     int 0x13
     jnc success
-    call error
+    mov al, '!'
+    call putc
+    call reset
     pop cx
     pop ax
     jmp nextsector      ; TODO: only try 3 times before halting
 
 success:
-;    mov al, '.'
-;    call putc
+%if DEBUG
+    mov al, '.'
+    call putc
+%endif
 
     mov ax, es
     add ax, 0x20
@@ -48,8 +54,10 @@ success:
     inc ax
     loop nextsector
 
-    mov al, 'O'
+%if DEBUG
+    mov al, '>'
     call putc
+%endif
 
     lgdt [cs:GDT]
     mov eax, cr0
@@ -81,29 +89,89 @@ putc:
     pop ax
     ret
 
-error:
-    mov al, '!'
-    call putc
-;    mov al, ah
-;    call hex8
-
-; fall-through
 reset:
-    mov dl, 0           ; TODO: don't destroy dl?
+    mov dl, 0
     xor ax, ax
     int 0x13            ; 13h/00 = reset drive
-    jc error
+    jc reset
     ret
 
-GDT   dw 0xffff         ; limit
-      dd GDT            ; offset
-      dw 0
-       ; 0xBBBBLLLL, 0xBBFLAABB    ; F = GS00b, AA = 1001XDW0
-gdtCS dd 0x0000ffff, 0x00CF9A00    ; 0x08h
-gdtDS dd 0x0000ffff, 0x00CF9200    ; 0x10h
+; --- protected mode ---
+[bits 32]
+
+IDTR   dw 64*8-1                    ; limit
+       dd 0                         ; linear address 0
+
+GDT    dw 0x20                      ; limit of 4 entries
+       dd GDT                       ; linear address of GDT
+       dw 0
+        ; 0xBBBBLLLL, 0xBBFLAABB    ; F = GS00b, AA = 1001XDW0
+gdtCS  dd 0x0000ffff, 0x00CF9A00    ; 0x08h
+gdtDS  dd 0x0000ffff, 0x00CF9200    ; 0x10h
+gdtTSS dd 0x10000067, 0x00008800    ; 0x18h
+
+isrESP dd 0x00001000
+
+; <= 16 bytes for the stub
+stage0isr:
+    xchg esp, [isrESP]
+    push 0
+    jmp [isr1] ; weird indirect jmp because i can't figure out how to force
+               ;   nasm to generate an absolute jmp to a label
+
+stage1isr:
+    xchg eax, [esp]
+
+    pushad
+
+%if DEBUG
+    ; DEBUG: display interrupt# in upper right
+    push eax
+    mov edi, 0xb8000 + 160 + 156
+    call hex8
+    pop eax
+%endif
+
+    push eax              ; interrupt # is argument
+    call [isr2]
+    pop eax
+
+    popad
+
+    pop eax
+    xchg esp, [isrESP]
+    iret
+
+%macro outbyte 2
+    mov al, %2
+    out %1, al
+%endmacro
+
+_halt:
+    hlt
+
+%if DEBUG
+hex8:
+    mov bl, al
+    shr al, 4
+    call hex4
+    mov al, bl
+;    call hex4
+;    ret
+
+hex4:
+    and al, 0x0f
+    add al, '0'
+    cmp al, '9'
+    jle printit
+    add al, 'A' - '0' - 10
+printit:
+    mov ah, 0x0F
+    stosw
+    ret
+%endif
 
 protmain:
-[bits 32]
     mov ax, 0x10
     mov ds, ax
     mov ss, ax
@@ -111,13 +179,76 @@ protmain:
     mov fs, ax
     mov gs, ax
 
+;    mov ax, 0x18
+;    ltr ax               ; TSS descriptor
+;    xor eax, eax
+;    lldt ax              ; no LDT
+
     mov esp, 0x6000      ; data stack grows down
 
-    jmp 0x8000
+; create IDT entries, incrementing the stub address
+    xor edi, edi        ; IDT from 0x0 - 0x1FF
+    mov ecx, 64         ; 64 interrupts available (0-0x3f)
+    mov eax, 0x00080200 ; CS=0x08; IP[15:0] = 0x0200 (+ 16*interrupt#)
+    mov edx, 0x00008E00 ; IP[31:16] = 0; type=0x8E (32-bit int gate); reserved=0
+nextidtentry:
+    stosd
+    xchg eax, edx
+    stosd
+    xchg eax, edx
+    add eax, 0x0010     ; exception stub <=16 bytes
+    loop nextidtentry
 
-    times (512 - $ + entry - 2) db 0 ; pad boot sector with zeroes
-    db 0x55, 0xAA ; 2 byte boot signature
+; copy stage0isr stub, increasing the K in its 'push K'
+;    mov edi, 0x200      ; interrupt handlers are at 0x200 - 0x5FF
+    mov ecx, 64
+    mov al, 0
+nextinthandler:
+    mov esi, stage0isr
+    movsd
+    movsd
+    movsd
+    movsd
+    inc al
+    mov [esi-16 + 7], al
+    loop nextinthandler
 
-    mov edi, 0xb8002
-    mov dword [edi], 'K > '
+    lidt [IDTR]
+
+    jmp 0x8000           ; raw executable binary must be in sector 2
+
+%if DEBUG
+    mov edi, 0xb8000
+
+    mov esi, str_welcome
+    call dispstring
+
+    call 0x8000
+
+    mov word [0xb8000], '. '
     hlt
+str_welcome db 'welcome!', 0
+
+; move string at esi, to vidmem at edi
+dispstring:
+    push eax
+    mov ah, 0x07
+
+nextchar:
+    lodsb
+    stosw
+    or al, al
+    jnz nextchar
+
+    pop eax
+    ret
+%endif
+
+    times (512 - $ + entry - 12) db 0 ; pad boot sector with zeroes
+
+isr1 dd stage1isr            ; ISR stage 1 -- keep asm
+isr2 dd _halt                ; ISRstage2(intnum): [0x7DF8] = stage func ptr
+     dw 0x00                 ; 'reserved'
+
+     db 0x55, 0xAA ; 2 byte boot signature
+
