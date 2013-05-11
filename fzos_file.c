@@ -2,8 +2,8 @@
 
 FILE *os_path_open(const char *path, const char *mode) { return fopen(path, mode); }
 // ----
-extern char _binary_random_z5_start[];
-extern int _binary_random_z5_size[];
+extern char _binary_zcode_z5_start[];
+extern int _binary_zcode_z5_size[];
 int disk_highwater = 0;
 
 FILE *fopen(const char *path, const char *mode)
@@ -16,13 +16,13 @@ FILE *fopen(const char *path, const char *mode)
     fp->data = NULL;
     fp->fpos = 0;
 
-    char * file = &_binary_random_z5_start[0];
+    char * file = &_binary_zcode_z5_start[0];
     struct header *h;
 
     h = (struct header *) malloc(sizeof(struct header));
     strncpy(h->path, path, sizeof(h->path));
     h->status = 1;
-    h->length = (int) _binary_random_z5_size;
+    h->length = (int) _binary_zcode_z5_size;
 
 #ifdef WITH_HEADERS // and WRITABLE
     h = (struct header *) file;

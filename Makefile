@@ -1,17 +1,18 @@
 
-FROTZDIR = frotz-2.43d
+FROTZDIR=frotz-2.43d
 FROTZLIB=frotz_common.a
 
-BINS=boot.img bootloader.bin kernel.bin bootloader.bin.list $(FROTZLIB)
+BINS=fzos-floppy.img bootloader.bin kernel.bin $(FROTZLIB)
 
 CFLAGS += -Wall -Wextra -Werror -nostdlib -nostartfiles -nodefaultlibs \
 		  -Wno-pointer-sign -Wno-unused \
 		  -I$(FROTZDIR)/src/common -I.
 
 
-OBJS := $(patsubst %.c,%.o,$(wildcard fzos_*.c)) random.o
+# zcode.z5 is the z-code file to be interpreted
+OBJS := $(patsubst %.c,%.o,$(wildcard fzos_*.c)) zcode.o
 
-all: boot.img
+all: fzos-floppy.img
 
 $(FROTZLIB):
 	make -C $(FROTZDIR) src/$(FROTZLIB)
@@ -29,9 +30,9 @@ kernel.bin: $(FROTZLIB) kmain.o $(OBJS) linker.ld
 bootloader.bin: bootloader.asm
 	nasm -f bin -l $@.list -o $@ $<
 
-boot.img: bootloader.bin kernel.bin
+fzos-floppy.img: bootloader.bin kernel.bin
 	cat $^ > $@
 	truncate $@ --size=%1K
 
 clean:
-	rm -f $(BINS) $(OBJS) kmain.o
+	rm -f $(BINS) $(OBJS) kmain.o bootloader.bin.list kernel.bin.map
