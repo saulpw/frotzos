@@ -1,4 +1,4 @@
-#include "frotz.h"
+#include "frotzos.h"
 
 f_setup_t f_setup;
 

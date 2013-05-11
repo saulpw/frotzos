@@ -4,8 +4,8 @@ FROTZLIB=frotz_common.a
 
 BINS=fzos-floppy.img bootloader.bin kernel.bin $(FROTZLIB)
 
-CFLAGS += -Wall -Wextra -Werror -nostdlib -nostartfiles -nodefaultlibs \
-		  -Wno-pointer-sign -Wno-unused \
+CFLAGS += -Wall -Wextra -Werror -Wno-pointer-sign -Wno-unused \
+		  -nostdlib -nostdinc -nostartfiles -nodefaultlibs \
 		  -I$(FROTZDIR)/src/common -I.
 
 
@@ -15,7 +15,7 @@ OBJS := $(patsubst %.c,%.o,$(wildcard fzos_*.c)) zcode.o
 all: fzos-floppy.img
 
 $(FROTZLIB):
-	make -C $(FROTZDIR) src/$(FROTZLIB)
+	CFLAGS="-march=i386 -m32" make -C $(FROTZDIR) src/$(FROTZLIB)
 	cp $(FROTZDIR)/src/$(FROTZLIB) .
 
 kernel.bin: $(FROTZLIB) kmain.o $(OBJS) linker.ld
@@ -35,4 +35,5 @@ fzos-floppy.img: bootloader.bin kernel.bin
 	truncate $@ --size=%1K
 
 clean:
+	make -C $(FROTZDIR) clean
 	rm -f $(BINS) $(OBJS) kmain.o bootloader.bin.list kernel.bin.map

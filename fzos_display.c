@@ -1,4 +1,4 @@
-#include "frotz.h"
+#include "frotzos.h"
 
 static inline
 void os_display_num(int n, int base)
