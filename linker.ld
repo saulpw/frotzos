@@ -23,10 +23,10 @@ SECTIONS
 
     .bss :
     {
-        sbss = .;
+        START_BSS = .;
         *(COMMON)
         *(.bss)
-        ebss = .;
+        END_BSS = .;
     }
 
 }

@@ -45,8 +45,3 @@ enable_interrupts()
     asm volatile ("sti");
 }
 
-void
-os_init_setup()
-{
-    enable_interrupts();
-}

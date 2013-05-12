@@ -23,6 +23,7 @@ extern volatile char _TEXTMODE_BUFFER[];
 extern void os_fatal(const char *, ...); // noreturn
 extern void yield();    // hlt, block until interrupt
 extern void halt();     // hlt forever
+extern void enable_interrupts();
 
 extern unsigned long long rdtsc(void);
 

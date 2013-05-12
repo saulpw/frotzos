@@ -22,7 +22,7 @@ kernel.bin: $(FROTZLIB) kmain.o $(OBJS) linker.ld
 	ld -Map=$@.map -m elf_i386 --oformat binary -T linker.ld -o $@ $(OBJS) $(FROTZLIB)
 
 kernel.elf: $(FROTZLIB) kmain.o $(OBJS) linker.ld
-	ld -Map=$@.map -m elf_i386 -T linker.ld -o $@ $(OBJS) $(FROTZLIB)
+	ld -m elf_i386 -T linker.ld -o $@ $(OBJS) $(FROTZLIB)
 
 %.o: %.z5
 	objcopy -B i386 --input-target=binary --output-target=elf32-i386 $< $@

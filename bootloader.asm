@@ -54,7 +54,7 @@ success:
 %endif
 
     mov ax, es
-    add ax, 0x20
+    add ax, 0x20         ; shift the destination segment by 512bytes
     mov es, ax
 
     pop cx
