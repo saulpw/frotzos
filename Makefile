@@ -1,5 +1,5 @@
 
-FROTZDIR=frotz-2.43d
+FROTZDIR=frotz
 FROTZLIB=frotz_common.a
 
 BINS=fzos-floppy.img bootloader.bin kernel.bin $(FROTZLIB)
@@ -15,7 +15,7 @@ OBJS := $(patsubst %.c,%.o,$(wildcard fzos_*.c)) zcode.o
 all: fzos-floppy.img
 
 $(FROTZLIB):
-	CFLAGS="-march=i386 -m32" make -C $(FROTZDIR) src/$(FROTZLIB)
+	CFLAGS="-march=i386 -m32" make -C $(FROTZDIR) src/$(FROTZLIB) OPTS="-O2 -nostdinc -I.."
 	cp $(FROTZDIR)/src/$(FROTZLIB) .
 
 kernel.bin: $(FROTZLIB) kmain.o $(OBJS) linker.ld

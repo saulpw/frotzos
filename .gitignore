@@ -1,0 +1,6 @@
+*.o
+frotz_common.a
+bootloader.bin*
+*.img
+kernel.bin*
+zcode.z5
