@@ -1,6 +1,7 @@
 #include "frotzos.h"
 
 f_setup_t f_setup;
+extern char *story_name;
 
 void os_process_arguments (int argc, char *argv[])
 {
@@ -27,7 +28,7 @@ int os_random_seed (void)
     return rdtsc();
 }
 
-void os_fatal(const char *s)
+void os_fatal(const char *s, ...)
 {
     os_display_string(s);
     os_display_string("  HALT");

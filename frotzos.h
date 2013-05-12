@@ -20,7 +20,7 @@ extern volatile char _TEXTMODE_BUFFER[];
 
 #endif
 
-extern void os_fatal(); // noreturn
+extern void os_fatal(const char *, ...); // noreturn
 extern void yield();    // hlt, block until interrupt
 extern void halt();     // hlt forever
 
