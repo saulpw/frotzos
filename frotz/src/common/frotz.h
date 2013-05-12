@@ -660,7 +660,7 @@ void 	os_display_char (zchar);
 void 	os_display_string (const zchar *);
 void 	os_draw_picture (int, int, int);
 void 	os_erase_area (int, int, int, int);
-void 	os_fatal (const char *);
+void 	os_fatal (const char *, ...);
 void 	os_finish_with_sample ();
 int  	os_font_data (int, int *, int *);
 void 	os_init_screen (void);
