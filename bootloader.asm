@@ -21,7 +21,8 @@ start:
     mov es, ax
 
     mov ax, 1           ; starting sector (skip boot sector)
-    mov cx, 1215        ; # sectors in 0x08000-0xA0000 (640k - 32k)
+    mov cx, 1211        ; # sectors in 0x08000-0xA0000 (640k - 32k)
+    mov dx, 10          ; max 10 errors
 
 nextsector:
     push ax
@@ -37,7 +38,14 @@ nextsector:
     call reset
     pop cx
     pop ax
-    jmp nextsector      ; TODO: only try 3 times before halting
+    dec dx
+    jnz nextsector
+
+    mov al, ':'
+    call putc
+    mov al, '('
+    call putc
+    hlt
 
 success:
 %if DEBUG
