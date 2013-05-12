@@ -33,17 +33,10 @@ void os_process_arguments (int argc, char *argv[])
 void 	os_beep (int volume) { NOTIMPL; }
 void 	os_more_prompt (void)
 {
-//    NOTIMPL;
+    NOTIMPL;
 }
 
 int  	os_peek_colour (void) { NOTIMPL; return 0; }
-
-zchar	os_read_key (int timeout, int show_cursor)
-{
-    yield();
-//    NOTIMPL;
-    return 0;
-}
 
 int os_read_file_name (char *fn, const char *default_fn, int flag)
 {

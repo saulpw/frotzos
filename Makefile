@@ -39,4 +39,4 @@ fzos-floppy.img: bootloader.bin kernel.bin
 
 clean:
 	make -C $(FROTZDIR) clean
-	rm -f $(BINS) $(OBJS) kmain.o bootloader.bin.list kernel.bin.map
+	rm -f $(BINS) $(OBJS) kmain.o bootloader.bin.list *.map kernel.elf
