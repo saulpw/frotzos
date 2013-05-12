@@ -1,6 +1,5 @@
 ENTRY (kmain)
 STARTUP(kmain.o)
-OUTPUT_FORMAT(binary)
 
 _TEXTMODE_BUFFER = 0xb8000;
 . = 0x00008000;
