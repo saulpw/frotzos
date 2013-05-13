@@ -5,34 +5,6 @@ int current_color = 0x7;
 static int current_style = 0;
 static int current_fg = GREY_COLOUR, current_bg = BLUE_COLOUR;
 
-static inline
-void os_display_num(int n, int base)
-{
-    static const char digits[] = "0123456789ABCDEF";
-    char buf[16] = { 0 };
-    int i=10;
-    do { 
-        int d = n % base;
-        buf[i--] = digits[d];
-        n /= base;
-    } while (n > 0);
-    os_display_string(&buf[i+1]);
-}
-
-void
-trace(const char *funcname, const char *filename, int lineno, const char *note)
-{
-    os_display_string(funcname);
-    os_display_string("(");
-    os_display_string(filename);
-    os_display_string(":");
-    os_display_num(lineno, 10);
-    os_display_string(")");
-    os_display_string(": ");
-    os_display_string(note);
-    os_display_char('\n');
-}
-
 int os_font_data (int font, int *height, int *width)
 {
     if (font == TEXT_FONT) {
@@ -78,8 +50,9 @@ int os_string_width (const zchar *s)
 
 void os_init_screen(void)
 {
-    h_config = CONFIG_COLOUR | CONFIG_EMPHASIS | CONFIG_BOLDFACE | CONFIG_FIXED | CONFIG_TIMEDINPUT;      //(aka flags 1)
-    h_flags = COLOUR_FLAG;         //(aka flags 2)
+    h_config = CONFIG_COLOUR | CONFIG_EMPHASIS | CONFIG_BOLDFACE 
+             | CONFIG_FIXED | CONFIG_TIMEDINPUT;
+    h_flags = UNDO_FLAG | COLOUR_FLAG;         //(aka flags 2)
     h_screen_cols = 80; // (aka screen width in characters)
     h_screen_rows = 25; // (aka screen height in lines)
     h_screen_width = h_screen_cols;
@@ -150,39 +123,11 @@ void os_set_text_style (int s)
     compute_current_color();
 }
 
-static inline int scrpos(int x, int y) {
-    return (y-1) * 80 + x-1;
-}
-
-static inline void * screenpos(int x, int y) {
-    return (void *) &_TEXTMODE_BUFFER[scrpos(x, y)*2];
-}
-
-static void set_hw_cursor()
-{
-    unsigned short pos = scrpos(cursor_x, cursor_y);
- 
-    // cursor LOW port to vga INDEX register
-    outb(0x3D4, 0x0F);
-    outb(0x3D5, (unsigned char)(pos & 0xFF));
-    // cursor HIGH port to vga INDEX register
-    outb(0x3D4, 0x0E);
-    outb(0x3D5, (unsigned char)((pos >> 8) & 0xFF));
-}
-
 void
 os_set_cursor (int y, int x)
 { 
     cursor_x = x;
     cursor_y = y;
-    set_hw_cursor();
-}
-
-void setch(char ch)
-{
-    volatile char *pos = screenpos(cursor_x, cursor_y);
-    pos[0] = ch;
-    pos[1] = current_color;
 }
 
 static
@@ -199,10 +144,9 @@ void addch(char c)
 #endif
     }
     else {
-        setch(c);
+        setch(cursor_x, cursor_y, c, current_color);
         cursor_x += 1;
     }
-    set_hw_cursor();
 }
 
 void os_display_char(zchar c)
@@ -242,7 +186,7 @@ void os_scroll_area (int top, int left, int bot, int right, int units)
 {
     int y;
     for (y=top; y <= bot; ++y) {
-        memcpy(screenpos(left, y), screenpos(left, y+units), (right-left)*2+2);
+        memcpy((void *) screenpos(left, y), (void *) screenpos(left, y+units), (right-left)*2+2);
         os_erase_area(y+units, left, y+units, right);
     }
 }
@@ -252,9 +196,7 @@ void os_erase_area (int top, int left, int bot, int right)
     int y, x;
     for (y=top; y <= bot; ++y) {
         for (x=left; x <= right; ++x) {
-            volatile char *p = screenpos(x, y);
-            p[0] = ' ';
-            p[1] = current_color;
+            setch(x, y, ' ', current_color);
         }
     }
 }

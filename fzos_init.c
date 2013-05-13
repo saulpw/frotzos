@@ -53,6 +53,11 @@ void os_fatal(const char *s, ...)
     halt();
 }
 
+void abort()
+{
+    os_fatal("abort()");
+}
+
 int os_picture_data (int num, int *h, int *w)
 {
     NOTIMPL;

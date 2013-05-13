@@ -9,16 +9,22 @@ INCLUDES= -I$(FROTZDIR)/src/common -I.
 WARNFLAGS=-Wall -Wextra -Werror -Wno-pointer-sign -Wno-unused
 CFLAGS += -ggdb -O2 $(ARCHFLAGS) $(INCLUDES) $(WARNFLAGS)
 
+MALLOC_CFLAGS= -O3 -DLACKS_UNISTD_H -DLACKS_FCNTL_H -DLACKS_SYS_PARAM_H  \
+-DLACKS_SYS_MMAN_H -DLACKS_STRINGS_H -DLACKS_ERRNO_H -DLACKS_SYS_TYPES_H \
+-DLACKS_SCHED_H -DLACKS_TIME_H -Dmalloc_getpagesize=4096 -DHAVE_MMAP=0   \
+-DMALLOC_FAILURE_ACTION='abort()' -DENOMEM=12 -DEINVAL=22
+
 # zcode.z5 is the z-code file to be interpreted
-OBJS := fzos_asm.o        \
-		fzos_display.o    \
+OBJS := fzos_display.o    \
 		fzos_file.o       \
+		fzos_hw.o         \
 		fzos_init.o       \
 		fzos_input.o      \
-		fzos_interrupts.o \
 		fzos_mem.o        \
 		fzos_readline.o   \
 		fzos_string.o     \
+		debug.o           \
+		malloc.o          \
 		zcode.o
 
 all: fzos-floppy.img kernel.elf
@@ -37,7 +43,11 @@ kernel.elf: $(FROTZLIB) kmain.o $(OBJS) linker.ld
 	objcopy -B i386 --input-target=binary --output-target=elf32-i386 $< $@
 
 .c.o:
-	gcc $(CFLAGS) -c -o $@ $<
+	gcc -c $(CFLAGS) -o $@ $<
+
+malloc.o: malloc.c
+	gcc -c $(CFLAGS) $(MALLOC_CFLAGS) -o $@ $<
+
 
 bootloader.bin: bootloader.asm
 	nasm -f bin -l $@.list -o $@ $<

@@ -4,32 +4,30 @@
 #include <string.h>
 #include "frotz.h"
 
+extern volatile int ticks;  // 1/20s of a second since start
+
+extern int cursor_x, cursor_y, current_color;
 extern volatile char _TEXTMODE_BUFFER[];
-extern int cursor_x, cursor_y;
 
-void movecur(int dx, int dy);
-void setch(char ch);
+static inline volatile char * screenpos(int x, int y) {
+    int pos = (y-1) * 80 + x-1;
+    return (volatile void *) &_TEXTMODE_BUFFER[pos*2];
+}
 
-#define NOTIMPL TRACE(NOTIMPL)
-#define TRACE(X) trace(__FUNCTION__, __FILE__, __LINE__, #X)
-extern void trace(const char *func, const char *fn, int line, const char *note);
+extern void movecur(int dx, int dy);
+extern void setch(int x, int y, char ch, char attr);
+extern void set_hw_cursor(int x, int y);
 
 extern void yield();    // hlt, block until interrupt
 extern void halt();     // hlt forever
-extern void enable_interrupts();
-extern void isr_keyboard();
-extern void isr_timer();
 
+// read time-stamp counter
 extern unsigned long long rdtsc(void);
 
-static inline void outb( unsigned short port, unsigned char val ) {
-    asm volatile( "outb %0, %1" : : "a"(val), "Nd"(port) );
-}
-
-static inline unsigned char inportb(unsigned int port) {
-   unsigned char ret;
-   asm volatile ("inb %%dx,%%al":"=a" (ret):"d" (port));
-   return ret;
-}
+// debug functions
+#define NOTIMPL TRACE(NOTIMPL)
+#define TRACE(X) trace(__FUNCTION__, __FILE__, __LINE__, #X)
+extern void trace(const char *func, const char *fn, int line, const char *note);
+extern void os_display_num(int n, int base);
 
 #endif

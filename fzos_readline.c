@@ -8,10 +8,11 @@ void movecur(int dx, int dy)
 zchar
 os_read_line(int max, zchar *buf, int timeout, int width, int continued)
 {
-    int i=0;
+    int i = strlen(buf); // allow preloaded input
 
     while (1) {
         zchar ch = os_read_key(timeout, TRUE);
+
         if (max == 0) return ch;
 
         switch (ch) {
@@ -21,7 +22,12 @@ os_read_line(int max, zchar *buf, int timeout, int width, int continued)
         case 4:  break; // ^d remove char at right of cursor
         case 5:  break; // ^e go to end of line
         case 6:  break; // ^f move right
-        case 8:  if (i > 0) { buf[--i] = 0; movecur(-1, 0); setch(' '); } break;
+        case 8:  if (i > 0) { 
+                    buf[--i] = 0;
+                    movecur(-1, 0);
+                    setch(cursor_x, cursor_y, ' ', current_color);
+                 }
+                 break;
         case 11: break; // ^k delete to end of line
         case 13: buf[i] = 0; return ch;
         case 20: break; // ^t swap char with previous
