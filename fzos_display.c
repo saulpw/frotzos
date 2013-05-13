@@ -1,9 +1,7 @@
 #include "frotzos.h"
 
 int cursor_x=0, cursor_y=0;
-int current_color = 0xf;
-
-#define STRIDE (80 * 2)
+int current_color = 0x7;
 
 static inline
 void os_display_num(int n, int base)
@@ -41,14 +39,32 @@ int os_font_data (int font, int *height, int *width)
     return 0;
 }
 
-void os_set_font (int x)
+void os_set_font (int f)
 {
-//    NOTIMPL;
+    switch (f) {
+    case TEXT_FONT:
+    case PICTURE_FONT:
+    case GRAPHICS_FONT:
+    case FIXED_WIDTH_FONT:
+    default:
+        break;
+    };
 }
 
-void os_set_text_style (int x)
+void os_set_text_style (int s)
 {
-    NOTIMPL;
+    switch (s) {
+    case REVERSE_STYLE:
+        current_color = (current_color >> 4) | (current_color << 4);
+        break;
+    case BOLDFACE_STYLE:
+    case EMPHASIS_STYLE:
+        current_color |= 0x8;
+        break;
+    case FIXED_WIDTH_STYLE:
+    default:
+        break;
+    };
 }
 
 int os_char_width (zchar c)
@@ -79,12 +95,12 @@ void os_init_screen(void)
     h_config = CONFIG_COLOUR;      //(aka flags 1)
     h_flags = COLOUR_FLAG;         //(aka flags 2)
     h_screen_cols = 80; // (aka screen width in characters)
-    h_screen_rows = 24; // (aka screen height in lines)
+    h_screen_rows = 25; // (aka screen height in lines)
     h_screen_width = h_screen_cols;
     h_screen_height = h_screen_rows;
     h_font_height = 1;
     h_font_width = 1;
-    h_default_foreground = WHITE_COLOUR;
+    h_default_foreground = GREY_COLOUR;
     h_default_background = BLUE_COLOUR;
     h_interpreter_number = h_version == 6 ? INTERP_MSDOS : INTERP_DEC_20;
     h_interpreter_version = 'F';
@@ -92,14 +108,6 @@ void os_init_screen(void)
 
 void os_reset_screen (void)
 {
-    NOTIMPL;
-}
-
-void
-os_set_cursor (int y, int x)
-{ 
-    cursor_x = x;
-    cursor_y = y;
 }
 
 static
@@ -124,13 +132,44 @@ unsigned int color_code(int c)
     };
 }
 
-void 	os_set_colour (int fg, int bg)
+void os_set_colour (int fg, int bg)
 {
     current_color = (color_code(bg) << 4) | color_code(fg);
 }
 
+static inline int scrpos(int x, int y) {
+    return (y-1) * 80 + x-1;
+}
+
 static inline void * screenpos(int x, int y) {
-    return (void *) &_TEXTMODE_BUFFER[(y-1)*STRIDE + (x-1)*2];
+    return (void *) &_TEXTMODE_BUFFER[scrpos(x, y)*2];
+}
+
+static void set_hw_cursor()
+{
+    unsigned short pos = scrpos(cursor_x, cursor_y);
+ 
+    // cursor LOW port to vga INDEX register
+    outb(0x3D4, 0x0F);
+    outb(0x3D5, (unsigned char)(pos & 0xFF));
+    // cursor HIGH port to vga INDEX register
+    outb(0x3D4, 0x0E);
+    outb(0x3D5, (unsigned char)((pos >> 8) & 0xFF));
+}
+
+void
+os_set_cursor (int y, int x)
+{ 
+    cursor_x = x;
+    cursor_y = y;
+    set_hw_cursor();
+}
+
+void setch(char ch)
+{
+    volatile char *pos = screenpos(cursor_x, cursor_y);
+    pos[0] = ch;
+    pos[1] = current_color;
 }
 
 static
@@ -138,20 +177,19 @@ void addch(char c)
 {
     if (c == '\n')
     {
-        yield();
         cursor_x = 0;
+#if 0
         if (++cursor_y > h_screen_rows) {
             os_scroll_area(0, 0, h_screen_rows, h_screen_cols, 1);
             cursor_y -= 1;
         }
+#endif
     }
     else {
-        volatile char *curpos = screenpos(cursor_x, cursor_y);
-        curpos[0] = c;
-        curpos[1] = current_color;
+        setch(c);
         cursor_x += 1;
     }
-    // XXX: move screen cursor
+    set_hw_cursor();
 }
 
 void os_display_char(zchar c)
@@ -171,25 +209,36 @@ void os_display_char(zchar c)
 
 void os_display_string(const zchar *s)
 {
-    while (*s) {
-        os_display_char(*s++);
-    }
+    zchar ch;
+    while ((ch = *s++)) {
+        switch (ch) {
+        case ZC_NEW_FONT:
+            os_set_font(*s++);
+            break;
+        case ZC_NEW_STYLE:
+            os_set_text_style(*s++);
+            break;
+        default:
+            os_display_char(ch);
+            break;
+        };
+    };
 }
 
 void os_scroll_area (int top, int left, int bot, int right, int units)
 {
     int y;
-    for (y=top; y < bot; ++y) {
-        memcpy(screenpos(left, y), screenpos(left, y+units), (right-left)*2);
-        memset(screenpos(left, y+units), 0, (right-left)*2);
+    for (y=top; y <= bot; ++y) {
+        memcpy(screenpos(left, y), screenpos(left, y+units), (right-left)*2+2);
+        os_erase_area(y+units, left, y+units, right);
     }
 }
 
 void os_erase_area (int top, int left, int bot, int right)
 {
     int y, x;
-    for (y=top; y < bot; ++y) {
-        for (x=left; x < right; ++x) {
+    for (y=top; y <= bot; ++y) {
+        for (x=left; x <= right; ++x) {
             volatile char *p = screenpos(x, y);
             p[0] = ' ';
             p[1] = current_color;
@@ -197,16 +246,14 @@ void os_erase_area (int top, int left, int bot, int right)
     }
 }
 
-void memory_dump(const char *ptr, int len)
+void os_more_prompt(void)
 {
-    int i;
-    for (i=0; i < len; i++) {
-        os_display_num(ptr[i], 16);
-        if (i % 16 == 0) 
-            os_display_char('\n');
-        else
-            os_display_char(' ');
-    }
+    int oldx = cursor_x;
+    int oldy = cursor_y;
+    os_display_string("[more]");
+    os_read_key(0, TRUE);
+    os_set_cursor(oldy, oldx);
+    os_display_string("      ");
+    os_set_cursor(oldy, oldx);
 }
-
 

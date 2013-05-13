@@ -11,8 +11,14 @@ This builds a floppy image that can be booted in a VM to run a .z5 program
 3. Create a virtualbox VM with fzos-floppy.bin in the floppy drive.
 4. launch the VM
 
-## TODO:
+## TODO/bugs:
 
-* add the NOTIMPLs
-* create keyboard handler
-
+* first scroll discoloration
+* extended characters (etude.z5/#7)
+* reverse and bold text (etude.z5/4)
+* real allocator for malloc/realloc/free
+* add headers to files (simplest 'filesystem')
+   * allow save games and transcripts, extractable with reverse engineering
+* timeout on os_read_key
+* beep
+* load executable image above 0x100000

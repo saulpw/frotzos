@@ -2,12 +2,12 @@
 
 void *malloc(size_t size)
 {
-    static char *nextalloc = (char *) 0x90000;
+    static char *nextalloc = (char *) 0x100000; // over the 1MB line
 
     char *ret = nextalloc;
     nextalloc += size;
-    if (nextalloc > (char *) 0xA0000) {
-        os_fatal("malloc'ed more than 64k");
+    if (nextalloc > (char *) 0x300000) {
+        os_fatal("malloc'ed more than 3MB");
     }
     return ret;
 }

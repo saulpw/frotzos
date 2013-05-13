@@ -10,7 +10,16 @@ WARNFLAGS=-Wall -Wextra -Werror -Wno-pointer-sign -Wno-unused
 CFLAGS += -ggdb -O2 $(ARCHFLAGS) $(INCLUDES) $(WARNFLAGS)
 
 # zcode.z5 is the z-code file to be interpreted
-OBJS := $(patsubst %.c,%.o,$(wildcard fzos_*.c)) zcode.o
+OBJS := fzos_asm.o        \
+		fzos_display.o    \
+		fzos_file.o       \
+		fzos_init.o       \
+		fzos_input.o      \
+		fzos_interrupts.o \
+		fzos_mem.o        \
+		fzos_readline.o   \
+		fzos_string.o     \
+		zcode.o
 
 all: fzos-floppy.img kernel.elf
 

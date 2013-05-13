@@ -4,3 +4,4 @@ bootloader.bin*
 *.img
 kernel.bin*
 zcode.z5
+kernel.elf
