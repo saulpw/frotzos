@@ -21,6 +21,8 @@ extern void set_hw_cursor(int x, int y);
 extern void yield();    // hlt, block until interrupt
 extern void halt();     // hlt forever
 
+extern void enable_interrupts();
+
 // read time-stamp counter
 extern unsigned long long rdtsc(void);
 
