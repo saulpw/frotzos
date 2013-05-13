@@ -2,6 +2,8 @@
 
 int cursor_x=0, cursor_y=0;
 int current_color = 0x7;
+static int current_style = 0;
+static int current_fg = GREY_COLOUR, current_bg = BLUE_COLOUR;
 
 static inline
 void os_display_num(int n, int base)
@@ -51,22 +53,6 @@ void os_set_font (int f)
     };
 }
 
-void os_set_text_style (int s)
-{
-    switch (s) {
-    case REVERSE_STYLE:
-        current_color = (current_color >> 4) | (current_color << 4);
-        break;
-    case BOLDFACE_STYLE:
-    case EMPHASIS_STYLE:
-        current_color |= 0x8;
-        break;
-    case FIXED_WIDTH_STYLE:
-    default:
-        break;
-    };
-}
-
 int os_char_width (zchar c)
 {
     // XXX: what about ZC_INDENT and ZC_GAP?
@@ -92,7 +78,7 @@ int os_string_width (const zchar *s)
 
 void os_init_screen(void)
 {
-    h_config = CONFIG_COLOUR;      //(aka flags 1)
+    h_config = CONFIG_COLOUR | CONFIG_EMPHASIS | CONFIG_BOLDFACE | CONFIG_FIXED | CONFIG_TIMEDINPUT;      //(aka flags 1)
     h_flags = COLOUR_FLAG;         //(aka flags 2)
     h_screen_cols = 80; // (aka screen width in characters)
     h_screen_rows = 25; // (aka screen height in lines)
@@ -132,9 +118,36 @@ unsigned int color_code(int c)
     };
 }
 
+static
+void compute_current_color()
+{
+    int fg, bg;
+
+    if (current_style & REVERSE_STYLE) {
+        bg = color_code(current_fg);
+        fg = color_code(current_bg);
+    } else {
+        fg = color_code(current_fg);
+        bg = color_code(current_bg);
+    }
+
+    if (current_style & BOLDFACE_STYLE) fg |= 0x08;
+    if (current_style & EMPHASIS_STYLE) bg |= 0x08;
+
+    current_color = (bg << 4) | fg;
+}
+
 void os_set_colour (int fg, int bg)
 {
-    current_color = (color_code(bg) << 4) | color_code(fg);
+    current_fg = fg;
+    current_bg = bg;
+    compute_current_color();
+}
+
+void os_set_text_style (int s)
+{
+    current_style = s;
+    compute_current_color();
 }
 
 static inline int scrpos(int x, int y) {
