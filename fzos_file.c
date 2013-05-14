@@ -1,51 +1,53 @@
 #include "frotzos.h"
+#include "filehdr.h"
 
-FILE *os_path_open(const char *path, const char *mode) { return fopen(path, mode); }
+FILE *os_path_open(const char *path, const char *mode)
+{ 
+    return fopen(path, mode);
+}
+
 // ----
-extern char _binary_zcode_z5_start[];
-extern int _binary_zcode_z5_size[];
 int disk_highwater = 0;
 
-FILE *fopen(const char *path, const char *mode)
+FILE *fopen(const char *name, const char *mode)
 {
-    FILE * fp = malloc(sizeof(FILE));
+    char * file = (char *) 0x8000;
+    struct fz_filehdr *h = (struct fz_filehdr *) file;
 
-    if (fp == NULL) return fp;
-
-    fp->hdr = NULL;
-    fp->data = NULL;
-    fp->fpos = 0;
-
-    char * file = &_binary_zcode_z5_start[0];
-    struct header *h;
-
-    h = (struct header *) malloc(sizeof(struct header));
-    strncpy(h->path, path, sizeof(h->path));
-    h->status = 1;
-    h->length = (int) _binary_zcode_z5_size;
-
-#ifdef WITH_HEADERS // and WRITABLE
-    h = (struct header *) file;
-    while (file[0])
+    while (h->status != STATUS_EMPTY)
     {
-        h = (struct header *) file;
-
-        if (strncmp(h->path, path, sizeof(h->path)) == 0) {
+        if (strncmp(h->name, name, h->namelength) == 0) {
             break;
         }
 
-        file += sizeof(struct header) + h->length;
+        file += sizeof(struct fz_filehdr) + h->namelength + h->length;
+
+        while (*file == 0) ++file; // skip remaining zero padding
+        h = (struct fz_filehdr *) file;
     }
 
-    if (file != &_KERNEL_END[disk_highwater])
+    if (h->status == STATUS_EMPTY)
     {
-        strncpy(h->path, path, sizeof(h->path));
-        h->status = 1;
+        size_t namelen = strlen(name);
+        if (namelen > 111) {
+            os_fatal("filename max length 111 bytes");
+        }
+
+        memset(h, 0, sizeof(struct fz_filehdr));
+        h->magic = MAGIC;
+//        h->length will be set as data is written
+        h->status = STATUS_APPENDING;
+        h->namelength = namelen;
+        strcpy(h->name, name);
     }
-#endif
     
-    fp->hdr = h;                
-    fp->data = file; //  + sizeof(*h);
+    FILE * fp = malloc(sizeof(FILE));
+
+    if (fp == NULL) return NULL;
+
+    fp->hdr = h;
+    fp->data = file + sizeof(struct fz_filehdr) + h->namelength;
+    fp->fpos = 0;
 
     return fp;
 }
@@ -54,7 +56,7 @@ int fclose(FILE *fp)
 {
     disk_highwater += fp->fpos;
     fp->hdr->length = fp->fpos;
-    fp->hdr->status = 2;
+    fp->hdr->status = STATUS_EXISTING;
     free(fp);
     return 0;
 }
@@ -89,7 +91,7 @@ int fseek(FILE *stream, long offset, int whence)
     } else if (whence == SEEK_CUR) {
         stream->fpos += offset;
     } else if (whence == SEEK_END) {
-        assert(offset <= stream->hdr->length);
+        assert((unsigned long) offset <= stream->hdr->length);
         stream->fpos = stream->hdr->length - offset;
     }
 
@@ -117,7 +119,10 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     size_t n = size*nmemb;
     memcpy(&stream->data[stream->fpos], ptr, n);
+    stream->hdr->length += n;
     stream->fpos += n;
+
+    assert(stream->hdr->length == stream->fpos);
     return n;
 }
 

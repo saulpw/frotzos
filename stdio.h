@@ -10,13 +10,9 @@
 
 typedef struct
 {
-    struct header {
-       char status; // 0=empty; 1=writing; 2=finished
-       char path[59];
-       int length;
-    } *hdr;
+    struct fz_filehdr *hdr;
     char *data;
-    long fpos;
+    unsigned long fpos;
 } FILE;
 
 extern FILE *fopen(const char *path, const char *mode);

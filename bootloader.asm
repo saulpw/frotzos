@@ -225,7 +225,7 @@ nextinthandler:
 
     call enable_A20
 
-    jmp 0x8000           ; raw executable binary must be in sector 2
+    jmp 0x8020           ; kernel starts after 32-byte header
 
 enable_A20: ; from wiki.osdev.org
     cli

@@ -2,7 +2,8 @@
 FROTZDIR=frotz
 FROTZLIB=frotz_common.a
 
-BINS=fzos-floppy.img bootloader.bin kernel.bin $(FROTZLIB)
+BINS=fzos-floppy.img mkfzimg bootloader.bin kernel.bin $(FROTZLIB)
+FILES=	kernel.bin zcode.z5
 
 ARCHFLAGS= -ffreestanding -m32 -nostdlib -nostdinc -nostartfiles -nodefaultlibs
 INCLUDES= -I$(FROTZDIR)/src/common -I.
@@ -15,7 +16,7 @@ MALLOC_CFLAGS= -O3 -DLACKS_UNISTD_H -DLACKS_FCNTL_H -DLACKS_SYS_PARAM_H  \
 -DMALLOC_FAILURE_ACTION='abort()' -DENOMEM=12 -DEINVAL=22
 
 # zcode.z5 is the z-code file to be interpreted
-OBJS := fzos_display.o    \
+FZ_OBJS := fzos_display.o    \
 		fzos_file.o       \
 		fzos_hw.o         \
 		fzos_init.o       \
@@ -24,23 +25,22 @@ OBJS := fzos_display.o    \
 		fzos_readline.o   \
 		fzos_string.o     \
 		debug.o           \
-		malloc.o          \
-		zcode.o
+		malloc.o
 
-all: fzos-floppy.img kernel.elf
+all: fzos-floppy.img kernel.elf mkfzimg
 
 $(FROTZLIB):
 	CFLAGS="-nostdinc -I.. -ggdb -march=i386 -m32" make -C $(FROTZDIR) src/$(FROTZLIB)
 	cp $(FROTZDIR)/src/$(FROTZLIB) .
 
-kernel.bin: $(FROTZLIB) kmain.o $(OBJS) linker.ld
-	ld -Map=$@.map -m elf_i386 --oformat binary -T linker.ld -o $@ $(OBJS) $(FROTZLIB)
+kernel.bin: $(FROTZLIB) kmain.o $(FZ_OBJS) linker.ld
+	ld -Map=$@.map -m elf_i386 --oformat binary -T linker.ld -o $@ $(FZ_OBJS) $(FROTZLIB)
 
-kernel.elf: $(FROTZLIB) kmain.o $(OBJS) linker.ld
-	ld -m elf_i386 -T linker.ld -o $@ $(OBJS) $(FROTZLIB)
+kernel.elf: $(FROTZLIB) kmain.o $(FZ_OBJS) linker.ld
+	ld -m elf_i386 -T linker.ld -o $@ $(FZ_OBJS) $(FROTZLIB)
 
-%.o: %.z5
-	objcopy -B i386 --input-target=binary --output-target=elf32-i386 $< $@
+mkfzimg: mkfzimg.c
+	gcc -ggdb -o $@ $<
 
 .c.o:
 	gcc -c $(CFLAGS) -o $@ $<
@@ -48,14 +48,16 @@ kernel.elf: $(FROTZLIB) kmain.o $(OBJS) linker.ld
 malloc.o: malloc.c
 	gcc -c $(CFLAGS) $(MALLOC_CFLAGS) -o $@ $<
 
-
 bootloader.bin: bootloader.asm
 	nasm -f bin -l $@.list -o $@ $<
 
-fzos-floppy.img: bootloader.bin kernel.bin
+simplefs.bin: mkfzimg $(FILES)
+	./mkfzimg -o $@ $(FILES)
+
+fzos-floppy.img: bootloader.bin simplefs.bin
 	cat $^ > $@
 	truncate $@ --size=%1K
 
 clean:
 	make -C $(FROTZDIR) clean
-	rm -f $(BINS) $(OBJS) kmain.o bootloader.bin.list *.map kernel.elf
+	rm -f $(BINS) $(FZ_OBJS) kmain.o bootloader.bin.list *.map kernel.elf

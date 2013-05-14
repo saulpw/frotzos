@@ -1,7 +1,7 @@
 #include "frotzos.h"
 
-int cursor_x=0, cursor_y=0;
-int current_color = 0x7;
+int cursor_x=1, cursor_y=24;
+int current_color = 0x17;
 static int current_style = 0;
 static int current_fg = GREY_COLOUR, current_bg = BLUE_COLOUR;
 
@@ -63,6 +63,8 @@ void os_init_screen(void)
     h_default_background = BLUE_COLOUR;
     h_interpreter_number = h_version == 6 ? INTERP_MSDOS : INTERP_DEC_20;
     h_interpreter_version = 'F';
+
+    os_erase_area(1,1,26,80); // gets rid of discoloration on first scroll
 }
 
 void os_reset_screen (void)
@@ -135,13 +137,11 @@ void addch(char c)
 {
     if (c == '\n')
     {
-        cursor_x = 0;
-#if 0
-        if (++cursor_y > h_screen_rows) {
-            os_scroll_area(0, 0, h_screen_rows, h_screen_cols, 1);
+        cursor_x = 1;
+        if (++cursor_y > 25) {
+            os_scroll_area(1, 1, 25, 80, 1);
             cursor_y -= 1;
         }
-#endif
     }
     else {
         setch(cursor_x, cursor_y, c, current_color);

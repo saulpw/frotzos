@@ -1,6 +1,7 @@
 #include "frotzos.h"
 
-static void *nextalloc = (char *) 0x100000; // over the 1MB line
+extern char HEAP[]; // after the bss
+static void *nextalloc = HEAP;
 
 void *sbrk(int incr)
 {
