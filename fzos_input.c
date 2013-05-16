@@ -12,8 +12,16 @@
 #define CAPSLK 0
 #define NUMLK 0
 #define SCRLLK 0
-#define PAD(N) 0
+#define P(N) (ZC_NUMPAD_MIN+N-1)
 #define DEL BKSP
+
+// scancodes for shift keys
+#define ALT    0x38
+#define CTRL   0x1d
+#define LSHIFT 0x2a
+#define RSHIFT 0x36
+
+static int depressed[256] = { 0 };
 
 static const unsigned char kbdus[128] = {
   0,ESC,'1','2','3','4','5','6','7','8','9','0','-','=',BKSP,          // 00-0E
@@ -22,11 +30,9 @@ static const unsigned char kbdus[128] = {
   0/*LSHIFT*/,'\\','z','x','c','v','b','n','m',',','.','/',0/*RSHIFT*/,// 2A-36
   0/*PTSCR*/,0/*ALT*/,' ', CAPSLK,                                     // 37-3A
   F(1),F(2),F(3),F(4),F(5),F(6),F(7),F(8),F(9),F(10),NUMLK,SCRLLK,     // 3B-46
-  PAD(7),PAD(8),PAD(9),'-',
-  PAD(4),PAD(5),PAD(6),'+',
-  PAD(1),PAD(2),PAD(3),PAD(0),DEL,                                     // 47-53
+  P(7),P(8),P(9),'-', P(4),P(5),P(6),'+', P(1),P(2),P(3),P(0),DEL,     // 47-53
   0,0,0,F(11),F(12),                                                   // 54-58
-  0,/* All other keys are undefined */
+  0, /* All other keys are undefined */
 };
 
 static const unsigned char kbdus_shift[128] = {
@@ -36,117 +42,77 @@ static const unsigned char kbdus_shift[128] = {
   0/*LSHIFT*/,'\\','Z','X','C','V','B','N','M','<','>','?',0/*RSHIFT*/,// 2A-36
   0/*PTSCR*/,0/*ALT*/,' ', CAPSLK,                                     // 37-3A
   F(1),F(2),F(3),F(4),F(5),F(6),F(7),F(8),F(9),F(10),NUMLK,SCRLLK,     // 3B-46
-  '7','8','9','-',
-  '4','5','6','+',
-  '1','2','3','0','.',                                                 // 47-53
+  '7','8','9','-', '4','5','6','+', '1','2','3','0','.',               // 47-53
   0,0,0,F(11),F(12),                                                   // 54-58
-  0, };
-
-static const unsigned char kbdus_ctrl[128] = {
-  0,0,0,0,0,0,0,0,0,0,0,0,31,0,0,                                      // 00-0E
-  0,17,23,5,18,20,25,21,9,15,16,27,29,0,                               // 0F-1C
-  0/*CTRL*/,1,19,4,6,7,8,10,11,12,0,0,0,                               // 1D-29
-  0/*LSHIFT*/,0,26,24,3,22,2,14,13,0,0,0,0/*RSHIFT*/,                  // 2A-36
-  0/*PTSCR*/,0/*ALT*/,0, CAPSLK,                                       // 37-3A
-  F(1),F(2),F(3),F(4),F(5),F(6),F(7),F(8),F(9),F(10),NUMLK,SCRLLK,     // 3B-46
-  0,0,0,0, 0,0,0,0, 0,0,0,0,0,                                         // 47-53
-  0,0,0,F(11),F(12),                                                   // 54-58
-  0, };
-
-static const unsigned char kbdus_alt[128] = {
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,                                       // 00-0E
-  0,ZC_HKEY_QUIT,0,0,ZC_HKEY_RECORD,0,0,ZC_HKEY_UNDO,0,0,0,0,0,0,      // 0F-1C
-  0/*CTRL*/,0,ZC_HKEY_SEED,ZC_HKEY_DEBUG,0,0,ZC_HKEY_HELP,0,0,0,0,0,0, // 1D-29
-  0/*LSHIFT*/,0,0,ZC_HKEY_QUIT,0,0,0,ZC_HKEY_RESTART,0,0,0,0,0,        // 2A-36
-  0/*PTSCR*/,0/*ALT*/,0, CAPSLK,                                       // 37-3A
-  F(1),F(2),F(3),F(4),F(5),F(6),F(7),F(8),F(9),F(10),NUMLK,SCRLLK,     // 3B-46
-  0,0,0,0, 0,0,0,0, 0,0,0,0,0,                                         // 47-53
-  0,0,0,F(11),F(12),                                                   // 54-58
-  0, };
-
-static char keyqueue[32];       // classic ring queue
-static int kqfront=0, kqback=0; // (kqend - kqstart) % 16 == size
-
-static void
-push_key(char c)
-{
-    if (kqback != kqfront - 1) {    // queue is not full
-        keyqueue[kqback++] = c;
-        kqback %= sizeof(keyqueue);
-    }
-}
-
-static char
-pop_key(int timeout)
-{
-    int startticks = ticks;
-
-    while (kqback == kqfront) {     // queue is empty
-        if (timeout && ticks - startticks > timeout) return ZC_TIME_OUT;
-        yield();
-    }
-
-    char k = keyqueue[kqfront++];
-    kqfront %= sizeof(keyqueue);
-    return k;
-}
+  0,
+};
 
 zchar
-os_read_key (int timeout, int show_cursor)
+os_read_key(int timeout, int show_cursor)
+{
+    return read_key(timeout, show_cursor, FALSE);
+}
+
+int
+read_key (int timeout, int show_cursor, int readline)
 {
     if (show_cursor)
         set_hw_cursor(cursor_x, cursor_y);
 
-    return pop_key(timeout*10);
-}
+    const float endseconds = seconds + ((float) timeout)/10;
 
-static int shifts[8] = { 0 };
+    int extended = FALSE;
 
-static int isshift(char scancode)
-{
-    switch (scancode & ~0x80)
-    {
-        case 0x2a: return 1; // left-shift
-        case 0x36: return 2; // right-shift
-        case 0x1d: return 3; // left-ctrl
-        case 0x38: return 4; // left-alt
-        default:   break;
-    };
-    return 0;
-}
+    do {
+        int scancode = pop_scancode();
+        if (scancode == -1) {
+            yield();
+        } else if (scancode == 0xe0) {
+            extended = TRUE;
+        } else if (scancode & 0x80) { // released
+            depressed[scancode & 0x7f] = 0;
+            extended = FALSE;
+        } else {
+            depressed[scancode] = 1;
 
-static char
-scancode_to_char(int sc)
-{
-    if (shifts[4]) {
-        return kbdus_alt[sc];
-    } else if (shifts[3]) {
-        return kbdus_ctrl[sc];
-    } else if (shifts[1] || shifts[2]) {
-        return kbdus_shift[sc];
-    } else {
-        return kbdus[sc];
-    }
-}
+            int shifts = depressed[ALT] << 9
+                       | depressed[CTRL] << 8;
 
-void key_released(int scancode)
-{
-    int s = isshift(scancode);
-    if (s) {
-        shifts[s] = 0;
-    }
-}
+            char ch = 0;
 
-void key_pressed(int scancode)
-{
-    int s = isshift(scancode);
-    if (s) {
-        shifts[s] = 1;
-    } else {
-        int c = scancode_to_char(scancode);
-        if (c)
-            push_key(c);
-        else 
+            if (depressed[LSHIFT] || depressed[RSHIFT]) {
+                ch = kbdus_shift[scancode];
+            } else {
+                ch = kbdus[scancode];
+            }
+
+            if (extended) {
+                switch (scancode) {
+                case 0x47: if (readline) return 0x0161; break; // home == ^a
+                case 0x48: return ZC_ARROW_UP;    // up
+                case 0x49: break;                 // pgup
+                case 0x4b: return ZC_ARROW_LEFT;  // left
+                case 0x4d: return ZC_ARROW_RIGHT; // right
+                case 0x4f: if (readline) return 0x0165; break; // end == ^e
+                case 0x50: return ZC_ARROW_DOWN;  // down
+                case 0x51: break;                 // pgdn
+                case 0x52: break;                 // ins
+                case 0x53: break;                 // del
+                };
+            } else {
+                if (!readline && shifts) {
+                    return ZC_BAD;
+                }
+
+                if (ch) {
+                    return ch | shifts;
+                }
+            }
+#ifdef DEBUG
             os_display_num(scancode, 16);
-    }
+#endif
+        }
+    } while (timeout == 0 || seconds < endseconds);
+
+    return ZC_TIME_OUT;
 }

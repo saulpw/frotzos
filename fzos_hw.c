@@ -1,7 +1,7 @@
 
 #include "frotzos.h"
 
-volatile int ticks = 0;
+volatile float seconds = 0.0; // seconds since boot
 
 void enable_interrupts();
 void isr_keyboard();
@@ -98,24 +98,40 @@ void set_hw_cursor(int x, int y)
 
 void isr_timer()
 {
-    ++ticks;
+    seconds += .01;
 
     static const char spinny[] = "\\|/-";
-    screenpos(80, 1)[0] = spinny[(ticks/10) % (sizeof(spinny)-1)];
+    screenpos(80, 1)[0] = spinny[(int) (seconds*10) % (sizeof(spinny)-1)];
 }
 
 extern void key_released(int sc);
 extern void key_pressed(int sc);
+
+static unsigned char keyqueue[128];       // classic ring queue
+static unsigned int kqfront=0, kqback=0; // (kqend - kqstart) % 16 == size
+
+int pop_scancode()
+{
+    if (kqback == kqfront) { // queue is empty
+        return -1;
+    }
+
+    unsigned char k = keyqueue[kqfront++];
+    kqfront %= sizeof(keyqueue);
+    return k;
+}
 
 void
 isr_keyboard()
 {
     int scancode = inportb(0x60);
 
-    if (scancode & 0x80)  // released
-        key_released(scancode & ~0x80);
-    else
-        key_pressed(scancode);
+    if ((kqback + 1) % sizeof(keyqueue) != kqfront)
+    {
+        keyqueue[kqback++] = scancode;
+        kqback %= sizeof(keyqueue);
+    } 
+    // else os_fatal("kb queue is full");
 }
 
 void yield()

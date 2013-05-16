@@ -2,7 +2,14 @@
 
 a return to the golden era of bootable games
 
-This builds a floppy image that can be booted in a VM to run a .z5 program
+This builds a floppy image that can be booted in a VM to run a .z5 program.
+
+## Features
+
+* standalone image--only an x86 hypervisor required to play
+* instant boot
+* no closed-source software except for game itself
+* original .z5 file easily identifiable and extractable
 
 ## To build:
 
@@ -13,12 +20,13 @@ This builds a floppy image that can be booted in a VM to run a .z5 program
 
 ## TODO/bugs:
 
-* first scroll discoloration
+* os_read_line positioning bug after timeout/continuation
 * extended characters (etude.z5/7)
-* timeout on os_read_line (etude/11)
-* add headers to files (simplest 'filesystem')
-   * allow save games and transcripts, extractable with reverse engineering
-* beep
+* allow save games and transcripts, extractable with reverse engineering
 * load executable image above 0x100000
-* when disk size exactly 360k, unable to boot
+* beep/sound
+
+## Gotchas
+
+* when disk size exactly 360k, disk geometry changes; truncate --size=361k to fix
 

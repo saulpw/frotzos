@@ -35,6 +35,7 @@ nextsector:
     jnc success
     mov al, '!'
     call putc
+    ; DEBUG: print ah for error code
     call reset
     pop cx
     pop ax
@@ -107,8 +108,12 @@ reset:
 ; --- protected mode ---
 [bits 32]
 
-IDTR   dw 64*8-1                    ; limit
-       dd 0                         ; linear address 0
+NUM_INTS equ 64
+IDT_ADDR equ 0x800
+HANDLER_ADDR equ IDT_ADDR + (NUM_INTS * 8)
+
+IDTR   dw NUM_INTS*8-1              ; limit
+idtptr dd IDT_ADDR                  ; linear address of IDT
 
 GDT    dw 0x20                      ; limit of 4 entries
        dd GDT                       ; linear address of GDT
@@ -195,9 +200,9 @@ protmain:
     mov esp, 0x6000      ; data stack grows down
 
 ; create IDT entries, incrementing the stub address
-    xor edi, edi        ; IDT from 0x0 - 0x1FF
-    mov ecx, 64         ; 64 interrupts available (0-0x3f)
-    mov eax, 0x00080200 ; CS=0x08; IP[15:0] = 0x0200 (+ 16*interrupt#)
+    mov edi, [idtptr]   ; IDT from 0x800 - 0x9FF
+    mov ecx, NUM_INTS   ; interrupts available (0-0x3f)
+    mov eax, 0x00080000 + HANDLER_ADDR ; CS=0x08; IP[15:0] = 0x0200 (+ 16*interrupt#)
     mov edx, 0x00008E00 ; IP[31:16] = 0; type=0x8E (32-bit int gate); reserved=0
 nextidtentry:
     stosd
@@ -208,8 +213,8 @@ nextidtentry:
     loop nextidtentry
 
 ; copy stage0isr stub, increasing the K in its 'push K'
-;    mov edi, 0x200      ; interrupt handlers are at 0x200 - 0x5FF
-    mov ecx, 64
+;    mov edi, HANDLER_ADDR      ; interrupt handlers are at 0xA00 - 0xDFF
+    mov ecx, NUM_INTS
     mov al, 0
 nextinthandler:
     mov esi, stage0isr
