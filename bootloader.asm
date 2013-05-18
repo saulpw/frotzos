@@ -8,6 +8,32 @@
 entry:
 	jmp 0x0000:start    ; set CS:IP to known values
 
+putc:
+    push ax
+    mov ah, 0x0e
+    int 0x10
+    pop ax
+    ret
+
+; dl = boot drive
+reset:
+    xor ax, ax
+    int 0x13            ; 13h/00 = reset drive
+    jc reset
+    ret
+
+a20wait:
+    in al,0x64
+    test al,2
+    jnz a20wait
+    ret
+
+a20wait2:
+    in al,0x64
+    test al,1
+    jz a20wait2
+    ret
+
 start:
     cli                 ; disable interrupts
     xor ax, ax
@@ -15,20 +41,93 @@ start:
     mov ss, ax
     mov sp, 0x7b00
 
+enable_A20: ; from wiki.osdev.org
+    call a20wait
+    mov al,0xAD
+    out 0x64,al
+
+    call a20wait
+    mov al,0xD0
+    out 0x64,al
+
+    call a20wait2
+    in al,0x60
+    push eax
+
+    call a20wait
+    mov al,0xD1
+    out 0x64,al
+
+    call a20wait
+    pop eax
+    or al,2
+    out 0x60,al
+
+    call a20wait
+    mov al,0xAE
+    out 0x64,al
+
+    call a20wait
+
+; A20 enabled
+
+    ; dl still boot drive
     call reset
 
     mov ax, 0x0800
     mov es, ax
 
+    mov si, 0x7000      ; drive parameters buffer
+    mov word [si], 0x1e ; (maximum size expected)
+    mov ah, 0x48        ; get drive parameters
+    int 0x13
+    jnc paramsok
+
+    mov al, '&'
+    call putc
+    hlt
+   
+paramsok:
+    mov [si], dl         ; save boot drive
+
+; dword [0x7004]  ; cylinders
+; dword [0x7008]  ; heads
+; dword [0x700C]  ; sectors/track
+; qword [0x7010]  ; total sectors on drive
+;  word [0x7018]  ; bytes/sector
+
+    shr word [si+0x18], 4 ; into paragraphs/sector for segment math
+
+    mov cx, [si+0x10]   ; total # of sectors
     mov ax, 1           ; starting sector (skip boot sector)
-    mov cx, 1211        ; # sectors in 0x08000-0xA0000 (640k - 32k)
+    sub cx, ax          ; # sectors to read = total sectors - 1 boot sector
     mov dx, 10          ; max 10 errors
 
 nextsector:
     push ax
     push cx
+    push dx
 
-    call LBAtoCHS       ; DX:CX = drive/head/track/sector
+    xor dx, dx            ; DX:AX
+    mov bx, [si+0x0c]     ; BX = SectorsPerTrack
+    mov cx, [si+0x08]     ; CX = NumHeads
+
+; in: DX:AX=LBA Sector, BX=SectorsPerTrack, CX = NumHeads
+; out: DH, CX compatible with int 13h/02
+LBAtoCHS:
+    div bx           ; ax = LBA/SectorsPerTrack = track# * head#
+
+    inc dx           ; dx = remainder+1 = sector#
+    push dx
+    xor dx, dx       ; dx:ax = track# * head#
+    div cx           ; ax = track#, dx = head#
+
+    mov dh, dl       ; dh = head#
+    pop cx           ; cx[5:0]  = sector#
+    shr ax, 5
+    or cx, ax        ; cx[15:6] = track#
+
+    mov dl, [si]
     xor bx, bx          ; ES:BX = dest address for load
     mov ax, 0x0201      ; function 13h/02, read 01 sectors
     int 0x13
@@ -37,16 +136,17 @@ nextsector:
     call putc
     ; DEBUG: print ah for error code
     call reset
+    pop dx
     pop cx
     pop ax
     dec dx
     jnz nextsector
 
-    mov al, ':'
+    mov al, '<'
     call putc
-    mov al, '('
-    call putc
+_halt:
     hlt
+    jmp _halt
 
 success:
 %if DEBUG
@@ -55,9 +155,10 @@ success:
 %endif
 
     mov ax, es
-    add ax, 0x20         ; shift the destination segment by 512bytes
+    add ax, [si+0x18]  ; shift the destination segment by bytes/sector
     mov es, ax
 
+    pop dx
     pop cx
     pop ax
     inc ax
@@ -68,48 +169,17 @@ success:
     call putc
 %endif
 
-    lgdt [cs:GDT]
-    mov eax, cr0
-    or al, 1
-    mov cr0, eax
-    jmp 0x08:protmain
-
-;[in AX=LBA Sector]
-;[out DX,CX]
-LBAtoCHS:
-    xor     dx,dx
-    mov     cx, 18 ; word [BOOT_SECTOR.sectorspertrack]
-    div     cx
-
-    inc     dx                    
-    mov     cl, dl   ;sectors
-    xor     dx,dx
-    mov     dh, al
-    and     dh, 0x1  ; head
-    shr     ax, 1    ; div [num_heads]
-    mov     ch, al   ; track
-    xor     dl, dl   ; drive
-    ret
-
-putc:
-    push ax
-    mov ah, 0x0e
-    int 0x10
-    pop ax
-    ret
-
-reset:
-    mov dl, 0
-    xor ax, ax
-    int 0x13            ; 13h/00 = reset drive
-    jc reset
-    ret
+    lgdt [GDT]                      ; ge
+    mov eax, cr0                    ; ro
+    or al, 1                        ; ni
+    mov cr0, eax                    ; mo
+    jmp 0x08:protmain               ; !!
 
 ; --- protected mode ---
 [bits 32]
 
-NUM_INTS equ 64
-IDT_ADDR equ 0x800
+NUM_INTS     equ 64
+IDT_ADDR     equ 0x800
 HANDLER_ADDR equ IDT_ADDR + (NUM_INTS * 8)
 
 IDTR   dw NUM_INTS*8-1              ; limit
@@ -122,67 +192,6 @@ GDT    dw 0x20                      ; limit of 4 entries
 gdtCS  dd 0x0000ffff, 0x00CF9A00    ; 0x08h
 gdtDS  dd 0x0000ffff, 0x00CF9200    ; 0x10h
 gdtTSS dd 0x10000067, 0x00008800    ; 0x18h
-
-isrESP dd 0x00001000
-
-; <= 16 bytes for the stub
-stage0isr:
-    xchg esp, [isrESP]
-    push 0
-    jmp [isr1] ; weird indirect jmp because i can't figure out how to force
-               ;   nasm to generate an absolute jmp to a label
-
-stage1isr:
-    xchg eax, [esp]
-
-    pushad
-
-%if DEBUG
-    ; DEBUG: display interrupt# in upper right
-    push eax
-    mov edi, 0xb8000 + 160 + 156
-    call hex8
-    pop eax
-%endif
-
-    push eax              ; interrupt # is argument
-    call [isr2]
-    pop eax
-
-    popad
-
-    pop eax
-    xchg esp, [isrESP]
-    iret
-
-%macro outbyte 2
-    mov al, %2
-    out %1, al
-%endmacro
-
-_halt:
-    hlt
-
-%if DEBUG
-hex8:
-    mov bl, al
-    shr al, 4
-    call hex4
-    mov al, bl
-;    call hex4
-;    ret
-
-hex4:
-    and al, 0x0f
-    add al, '0'
-    cmp al, '9'
-    jle printit
-    add al, 'A' - '0' - 10
-printit:
-    mov ah, 0x0F
-    stosw
-    ret
-%endif
 
 protmain:
     mov ax, 0x10
@@ -228,65 +237,66 @@ nextinthandler:
 
     lidt [IDTR]
 
-    call enable_A20
+    mov eax, 0x8010      ; after 16-byte FILE header
+    add al, [0x8015]     ; + filename size
+    jmp eax              ; kernel starts immediately
 
-    jmp 0x8020           ; kernel starts after 32-byte header
+isrESP dd 0x00002000
 
-enable_A20: ; from wiki.osdev.org
-    cli
+; <= 16 bytes for the stub
+stage0isr:
+    xchg esp, [isrESP]
+    push 0
+    jmp [isr1] ; weird indirect jmp because i can't figure out how to force
+               ;   nasm to generate an absolute jmp to a label
 
-    call    a20wait
-    mov     al,0xAD
-    out     0x64,al
+isr1    dd stage1isr            ; ISR stage 1 -- keep as assembly
 
-    call    a20wait
-    mov     al,0xD0
-    out     0x64,al
+stage1isr:
+    xchg eax, [esp]
 
-    call    a20wait2
-    in      al,0x60
-    push    eax
-
-    call    a20wait
-    mov     al,0xD1
-    out     0x64,al
-
-    call    a20wait
-    pop     eax
-    or      al,2
-    out     0x60,al
-
-    call    a20wait
-    mov     al,0xAE
-    out     0x64,al
-
-    call    a20wait
-    sti
-    ret
-
-a20wait:
-        in      al,0x64
-        test    al,2
-        jnz     a20wait
-        ret
-
-a20wait2:
-        in      al,0x64
-        test    al,1
-        jz      a20wait2
-        ret
+    pushad
 
 %if DEBUG
-    mov edi, 0xb8000
+    ; DEBUG: display interrupt#
+    push eax
+    mov edi, 0xb8000 + 160 + 156
+    shl eax, 2
+    add edi, eax
+    shr eax, 2
+    call hex8
+    pop eax
+%endif
 
-    mov esi, str_welcome
-    call dispstring
+    push eax              ; interrupt # is argument
+    call [isr2]
+    pop eax
 
-    call 0x8000
+    popad
 
-    mov word [0xb8000], '. '
-    hlt
-str_welcome db 'welcome!', 0
+    pop eax
+    xchg esp, [isrESP]
+    iret
+
+%if DEBUG
+hex8:
+    mov bl, al
+    shr al, 4
+    call hex4
+    mov al, bl
+;    call hex4
+;    ret
+
+hex4:
+    and al, 0x0f
+    add al, '0'
+    cmp al, '9'
+    jle printit
+    add al, 'A' - '0' - 10
+printit:
+    mov ah, 0x0F
+    stosw
+    ret
 
 ; move string at esi, to vidmem at edi
 dispstring:
@@ -303,9 +313,8 @@ nextchar:
     ret
 %endif
 
-    times (512 - $ + entry - 12) db 0 ; pad boot sector with zeroes
+    times (512 - $ + entry - 8) db 0 ; pad boot sector with zeroes
 
-isr1 dd stage1isr            ; ISR stage 1 -- keep asm
 isr2 dd _halt                ; ISRstage2(intnum): [0x7DF8] = stage func ptr
      dw 0x00                 ; 'reserved'
 
