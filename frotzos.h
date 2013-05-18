@@ -14,6 +14,9 @@ static inline volatile char * screenpos(int x, int y) {
     return (volatile void *) &_TEXTMODE_BUFFER[pos*2];
 }
 
+// get the array of filenames
+extern const char * const * enumfiles();
+
 extern void setch(int x, int y, char ch, char attr);
 extern void set_hw_cursor(int x, int y);
 

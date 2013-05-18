@@ -1,6 +1,38 @@
 #include "frotzos.h"
 #include "filehdr.h"
 
+#define MAX_FILES 256
+
+#define NEXT_FILE(HDR) ({ \
+    const char * d = (const char *) HDR; \
+    d += sizeof(struct fz_filehdr) + HDR->namelength + HDR->length; \
+    while (*d == 0) ++d; /* skip remaining zero padding */ \
+    (struct fz_filehdr *) d; \
+})
+
+const char * const * enumfiles()
+{
+    static const char **files = NULL;
+    
+    if (files == NULL) {
+        files = (const char **) malloc(sizeof(char *) * 256);   
+
+        int i=0;
+
+        char * data = (char *) 0x8000;
+        struct fz_filehdr *h = (struct fz_filehdr *) data;
+
+        while (h->status != STATUS_EMPTY)
+        {
+            files[i++] = h->name;
+            h = NEXT_FILE(h);
+        }
+        files[i] = (char *) NULL;
+    }
+
+    return files;
+}
+
 FILE *os_path_open(const char *path, const char *mode)
 { 
     return fopen(path, mode);
@@ -11,8 +43,7 @@ int disk_highwater = 0;
 
 FILE *fopen(const char *name, const char *mode)
 {
-    char * file = (char *) 0x8000;
-    struct fz_filehdr *h = (struct fz_filehdr *) file;
+    struct fz_filehdr *h = (struct fz_filehdr *) 0x8000;
 
     while (h->status != STATUS_EMPTY)
     {
@@ -20,10 +51,7 @@ FILE *fopen(const char *name, const char *mode)
             break;
         }
 
-        file += sizeof(struct fz_filehdr) + h->namelength + h->length;
-
-        while (*file == 0) ++file; // skip remaining zero padding
-        h = (struct fz_filehdr *) file;
+        h = NEXT_FILE(h);
     }
 
     if (h->status == STATUS_EMPTY)
@@ -46,7 +74,7 @@ FILE *fopen(const char *name, const char *mode)
     if (fp == NULL) return NULL;
 
     fp->hdr = h;
-    fp->data = file + sizeof(struct fz_filehdr) + h->namelength;
+    fp->data = ((char *) h) + sizeof(struct fz_filehdr) + h->namelength;
     fp->fpos = 0;
 
     return fp;

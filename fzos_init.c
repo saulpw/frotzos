@@ -26,7 +26,8 @@ void os_init_setup()
 
 void os_process_arguments (int argc, char *argv[])
 {
-    story_name = "zcode.z5";
+    const char * const * files = enumfiles();
+    story_name = (char *) files[1];
 //    graphics_filename = "gfx";
 }
 

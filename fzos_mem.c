@@ -7,8 +7,8 @@ void *sbrk(int incr)
 {
     void *ret = nextalloc;
     nextalloc += incr;
-    if (nextalloc > (void *) 0x400000) {
-        os_fatal("sbrk'ed more than 3MB");
+    if (nextalloc > (void *) 0xF00000) {
+        os_fatal("sbrk'ed more than 14MB");
     }
     return ret;
 }

@@ -5,7 +5,7 @@ typedef signed int ptrdiff_t;
 typedef unsigned int size_t;
 typedef signed int time_t;
 
-#define NULL 0
+#define NULL ((void *) 0)
 
 #define assert(X) do { if (!(X)) { os_fatal("assert failed: " #X); } \
     } while (0)
