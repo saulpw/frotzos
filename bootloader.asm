@@ -1,6 +1,7 @@
 ; compile with nasm, use as floppy image to Virtualbox
 
 %define DEBUG 0
+%define HD_EXTENSIONS 0
 
 [BITS 16]
 [ORG 0x7c00]
@@ -34,12 +35,17 @@ a20wait2:
     jz a20wait2
     ret
 
+parmserr:
+    mov al, '&'
+    call putc
+    hlt
+
 start:
     cli                 ; disable interrupts
     xor ax, ax
     mov ds, ax
     mov ss, ax
-    mov sp, 0x7b00
+    mov sp, 0x7c00      ; just before the code
 
 enable_A20: ; from wiki.osdev.org
     call a20wait
@@ -71,34 +77,56 @@ enable_A20: ; from wiki.osdev.org
 
 ; A20 enabled
 
-    ; dl still boot drive
     call reset
 
-    mov ax, 0x0800
-    mov es, ax
+%define BOOT_DRIVE       byte [si]
+%define NUM_CYLINDERS    word [si+0x04] ; dword [0x7004]
+%define NUM_HEADS        word [si+0x08] ; dword [0x7008]
+%define SECTOR_PER_TRACK word [si+0x0c] ; dword [0x700C]
+%define TOTAL_SECTORS    word [si+0x10] ; qword [0x7010]
+%define PARA_PER_SECTOR  word [si+0x18] ;  word [0x7018] (in bytes at first)
 
+%if HD_EXTENSIONS
     mov si, 0x7000      ; drive parameters buffer
     mov word [si], 0x1e ; (maximum size expected)
     mov ah, 0x48        ; get drive parameters
     int 0x13
-    jnc paramsok
+    jc parmserr
 
-    mov al, '&'
-    call putc
-    hlt
-   
-paramsok:
-    mov [si], dl         ; save boot drive
+    mov BOOT_DRIVE, dl     ; save off boot drive
+    shr PARA_PER_SECTOR, 4 ; convert into paragraphs/sector for segment math
+    mov cx, TOTAL_SECTORS  ; total # of sectors
 
-; dword [0x7004]  ; cylinders
-; dword [0x7008]  ; heads
-; dword [0x700C]  ; sectors/track
-; qword [0x7010]  ; total sectors on drive
-;  word [0x7018]  ; bytes/sector
+%else
+    mov si, 0x7000      ; drive parameters buffer
+    mov BOOT_DRIVE, dl   ; save off boot drive before 13/08 trashes it
+    mov ah, 0x08
+    int 0x13
+    jc parmserr
 
-    shr word [si+0x18], 4 ; into paragraphs/sector for segment math
+    mov word PARA_PER_SECTOR, 0x20 ; 512 bytes/sector is 32 paragraphs
 
-    mov cx, [si+0x10]   ; total # of sectors
+; set up parameters for LBAtoCHS
+
+;;; unused
+;    push cx
+;    shr cx, 6
+;    mov NUM_CYLINDERS, cx   ; max value of cylinder
+;    pop cx
+
+    and cx, 0x3f        ; mask off lower two bits of cylinder
+    mov SECTOR_PER_TRACK, cx ; max value of sector
+
+    shr dx, 8           ; dx = dh (# heads)
+    inc dx
+    mov NUM_HEADS, dx
+
+    mov cx, 1165        ; read 600k at most (up to 2k below 640k)
+%endif
+
+    mov ax, 0x0800
+    mov es, ax
+
     mov ax, 1           ; starting sector (skip boot sector)
     sub cx, ax          ; # sectors to read = total sectors - 1 boot sector
     mov dx, 10          ; max 10 errors
@@ -108,9 +136,9 @@ nextsector:
     push cx
     push dx
 
-    xor dx, dx            ; DX:AX
-    mov bx, [si+0x0c]     ; BX = SectorsPerTrack
-    mov cx, [si+0x08]     ; CX = NumHeads
+    xor dx, dx               ; DX:AX = LBA
+    mov bx, SECTOR_PER_TRACK ; BX = SectorsPerTrack
+    mov cx, NUM_HEADS        ; CX = NumHeads
 
 ; in: DX:AX=LBA Sector, BX=SectorsPerTrack, CX = NumHeads
 ; out: DH, CX compatible with int 13h/02
@@ -123,11 +151,13 @@ LBAtoCHS:
     div cx           ; ax = track#, dx = head#
 
     mov dh, dl       ; dh = head#
-    pop cx           ; cx[5:0]  = sector#
-    shr ax, 5
-    or cx, ax        ; cx[15:6] = track#
+    pop cx           ; cl[5:0] = sector#
 
-    mov dl, [si]
+    mov ch, al       ; ch = low 8 bits of track#
+    shl ah, 6
+    or cl, ah        ; cl[7:6] = high bits of track#
+     
+    mov dl, BOOT_DRIVE
     xor bx, bx          ; ES:BX = dest address for load
     mov ax, 0x0201      ; function 13h/02, read 01 sectors
     int 0x13
@@ -139,14 +169,15 @@ LBAtoCHS:
     pop dx
     pop cx
     pop ax
+
     dec dx
     jnz nextsector
 
     mov al, '<'
     call putc
-_halt:
-    hlt
-    jmp _halt
+
+    ; might be an odd-shaped disk, let's jump anyway
+    jmp leap
 
 success:
 %if DEBUG
@@ -155,7 +186,7 @@ success:
 %endif
 
     mov ax, es
-    add ax, [si+0x18]  ; shift the destination segment by bytes/sector
+    add ax, PARA_PER_SECTOR  ; shift the destination segment by bytes/sector
     mov es, ax
 
     pop dx
@@ -169,6 +200,7 @@ success:
     call putc
 %endif
 
+leap:
     lgdt [GDT]                      ; ge
     mov eax, cr0                    ; ro
     or al, 1                        ; ni
@@ -278,6 +310,19 @@ stage1isr:
     xchg esp, [isrESP]
     iret
 
+exception_halt: ; instead of iret, but restore state for easier debugging
+%if DEBUG
+    pop eax     ; remove ret address from call [isr2]
+    pop eax     ; remove exception number parameter
+    popad
+    pop eax     ; original eax
+    xchg esp, [isrESP]
+%endif
+_halt:
+    hlt
+    jmp _halt
+
+
 %if DEBUG
 hex8:
     mov bl, al
@@ -315,7 +360,7 @@ nextchar:
 
     times (512 - $ + entry - 8) db 0 ; pad boot sector with zeroes
 
-isr2 dd _halt                ; ISRstage2(intnum): [0x7DF8] = stage func ptr
+isr2 dd exception_halt       ; ISRstage2(intnum): [0x7DF8] = stage func ptr
      dw 0x00                 ; 'reserved'
 
      db 0x55, 0xAA ; 2 byte boot signature
