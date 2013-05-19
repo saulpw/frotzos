@@ -1,7 +1,6 @@
-; compile with nasm, use as floppy image to Virtualbox
+; compile with nasm, use as disk image to qemu-system-i386
 
 %define DEBUG 0
-%define HD_EXTENSIONS 0
 
 [BITS 16]
 [ORG 0x7c00]
@@ -17,10 +16,10 @@ putc:
     ret
 
 ; dl = boot drive
-reset:
+resetdisk:
     xor ax, ax
     int 0x13            ; 13h/00 = reset drive
-    jc reset
+    jc resetdisk
     ret
 
 a20wait:
@@ -39,6 +38,9 @@ parmserr:
     mov al, '&'
     call putc
     hlt
+
+retries     db 10   ; max 10 retries until fail
+current_lba dw 1    ; starting sector (skip boot sector)
 
 start:
     cli                 ; disable interrupts
@@ -77,7 +79,9 @@ enable_A20: ; from wiki.osdev.org
 
 ; A20 enabled
 
-    call reset
+    call resetdisk
+
+    mov si, 0x7000      ; drive parameters buffer
 
 %define BOOT_DRIVE       byte [si]
 %define NUM_CYLINDERS    word [si+0x04] ; dword [0x7004]
@@ -86,19 +90,6 @@ enable_A20: ; from wiki.osdev.org
 %define TOTAL_SECTORS    word [si+0x10] ; qword [0x7010]
 %define PARA_PER_SECTOR  word [si+0x18] ;  word [0x7018] (in bytes at first)
 
-%if HD_EXTENSIONS
-    mov si, 0x7000      ; drive parameters buffer
-    mov word [si], 0x1e ; (maximum size expected)
-    mov ah, 0x48        ; get drive parameters
-    int 0x13
-    jc parmserr
-
-    mov BOOT_DRIVE, dl     ; save off boot drive
-    shr PARA_PER_SECTOR, 4 ; convert into paragraphs/sector for segment math
-    mov cx, TOTAL_SECTORS  ; total # of sectors
-
-%else
-    mov si, 0x7000      ; drive parameters buffer
     mov BOOT_DRIVE, dl   ; save off boot drive before 13/08 trashes it
     mov ah, 0x08
     int 0x13
@@ -108,7 +99,7 @@ enable_A20: ; from wiki.osdev.org
 
 ; set up parameters for LBAtoCHS
 
-;;; unused
+;;; unnecessary
 ;    push cx
 ;    shr cx, 6
 ;    mov NUM_CYLINDERS, cx   ; max value of cylinder
@@ -122,19 +113,15 @@ enable_A20: ; from wiki.osdev.org
     mov NUM_HEADS, dx
 
     mov cx, 1165        ; read 600k at most (up to 2k below 640k)
-%endif
 
     mov ax, 0x0800
     mov es, ax
 
-    mov ax, 1           ; starting sector (skip boot sector)
-    sub cx, ax          ; # sectors to read = total sectors - 1 boot sector
-    mov dx, 10          ; max 10 errors
+    sub cx, [current_lba] ; # sectors to read = total sectors - 1 boot sector
 
 nextsector:
-    push ax
+    mov ax, [current_lba]
     push cx
-    push dx
 
     xor dx, dx               ; DX:AX = LBA
     mov bx, SECTOR_PER_TRACK ; BX = SectorsPerTrack
@@ -165,12 +152,10 @@ LBAtoCHS:
     mov al, '!'
     call putc
     ; DEBUG: print ah for error code
-    call reset
-    pop dx
+    call resetdisk
     pop cx
-    pop ax
 
-    dec dx
+    dec byte [retries]
     jnz nextsector
 
     mov al, '<'
@@ -189,10 +174,8 @@ success:
     add ax, PARA_PER_SECTOR  ; shift the destination segment by bytes/sector
     mov es, ax
 
-    pop dx
     pop cx
-    pop ax
-    inc ax
+    inc word [current_lba]
     loop nextsector
 
 %if DEBUG
@@ -270,7 +253,7 @@ nextinthandler:
     lidt [IDTR]
 
     mov eax, 0x8010      ; after 16-byte FILE header
-    add al, [0x8015]     ; + filename size
+    add al, [0x800f]     ; + filename size
     jmp eax              ; kernel starts immediately
 
 isrESP dd 0x00002000

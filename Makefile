@@ -14,7 +14,6 @@ MALLOC_CFLAGS= -O3 -DLACKS_UNISTD_H -DLACKS_FCNTL_H -DLACKS_SYS_PARAM_H  \
 -DLACKS_SCHED_H -DLACKS_TIME_H -Dmalloc_getpagesize=4096 -DHAVE_MMAP=0   \
 -DMALLOC_FAILURE_ACTION='abort()' -DENOMEM=12 -DEINVAL=22
 
-# zcode.z5 is the z-code file to be interpreted
 FZ_OBJS := fzos_display.o    \
 		fzos_file.o       \
 		fzos_hw.o         \
@@ -26,7 +25,8 @@ FZ_OBJS := fzos_display.o    \
 		debug.o           \
 		malloc.o
 
-all: LostPig.vmdk frotz.elf
+# if you have LostPig.z8, 'make LostPig.img'
+all: frotz.bin frotz.elf
 
 $(FROTZLIB):
 	CFLAGS="-nostdinc -I.. -ggdb -march=i386 -m32" make -C $(FROTZDIR) src/$(FROTZLIB)
@@ -53,7 +53,7 @@ bootloader.bin: bootloader.asm
 %.simplefs:	%.z* mkfzimg frotz.bin
 	./mkfzimg -o $@ frotz.bin $<
 
-%.vmdk: %.simplefs bootloader.bin
+%.img: %.simplefs bootloader.bin frotz.elf
 	cat bootloader.bin $< > $@
 	truncate $@ --size=%1K
 

@@ -14,21 +14,19 @@ This builds a floppy image that can be booted in a VM to run a .z5 program.
 ## To build an image:
 
 1. get a .z5 file (I used random.z5 from the frotz tests)
-2. make random.vmdk
+2. make random.img
 
 ## To use the resulting image
 
-3. qemu-system-i386 random.vmdk [-s]
+3. qemu-system-i386 [-fda] random.img
 
 ## TODO/bugs:
 
 * os_read_line positioning bug after timeout/continuation
 * extended characters (etude.z5/7)
 * allow save games and transcripts, extractable with reverse engineering
-* load executable image above 0x100000
 * beep/sound
 
 ## Gotchas
 
-* must be used as a hard drive image (not floppy) due to int 13h/48h
-* doesn't work as a hard disk on vmware/virtualbox due to bad mbr?
+* doesn't work as a hard disk on vmware/virtualbox
