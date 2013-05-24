@@ -101,7 +101,7 @@ void isr_timer()
     seconds += .01;
 
     static const char spinny[] = "\\|/-";
-    screenpos(80, 1)[0] = spinny[(int) (seconds*10) % (sizeof(spinny)-1)];
+    screenpos(80, 1)[0] = spinny[(int) (seconds) % (sizeof(spinny)-1)];
 }
 
 extern void key_released(int sc);

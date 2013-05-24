@@ -14,14 +14,14 @@ void os_init_setup()
 	f_setup.object_movement = 0;
 	f_setup.left_margin = 0;
 	f_setup.right_margin = 0;
-	f_setup.ignore_errors = 0;
+	f_setup.ignore_errors = 1;
 	f_setup.piracy = 0;		/* enable the piracy opcode */
 	f_setup.undo_slots = MAX_UNDO_SLOTS;
 	f_setup.expand_abbreviations = 0;
 	f_setup.script_cols = 80;
 	f_setup.save_quetzal = 1;
-	f_setup.sound = 1;
-	f_setup.err_report_mode = ERR_DEFAULT_REPORT_MODE;
+	f_setup.sound = 0;
+	f_setup.err_report_mode = ERR_REPORT_NEVER;
 }
 
 void os_process_arguments (int argc, char *argv[])
