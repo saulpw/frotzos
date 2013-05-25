@@ -10,13 +10,11 @@
     (struct fz_filehdr *) d; \
 })
 
-const char * const * enumfiles()
+struct fz_filehdr * const * enumfiles()
 {
-    static const char **files = NULL;
+    static struct fz_filehdr *files[MAX_FILES] = { 0 };
     
-    if (files == NULL) {
-        files = (const char **) malloc(sizeof(char *) * 256);   
-
+    if (files[0] == NULL) {
         int i=0;
 
         char * data = (char *) 0x8000;
@@ -24,10 +22,10 @@ const char * const * enumfiles()
 
         while (h->status != STATUS_EMPTY)
         {
-            files[i++] = h->name;
+            files[i++] = h;
             h = NEXT_FILE(h);
         }
-        files[i] = (char *) NULL;
+        files[i] = NULL;
     }
 
     return files;
@@ -43,15 +41,17 @@ int disk_highwater = 0;
 
 FILE *fopen(const char *name, const char *mode)
 {
-    struct fz_filehdr *h = (struct fz_filehdr *) 0x8000;
+    struct fz_filehdr * const * hdrs = enumfiles();
 
-    while (h->status != STATUS_EMPTY)
+    int i=0;
+    const struct fz_filehdr *h = NULL;
+    while (hdrs[i])
     {
+        h = hdrs[i];
         if (strncmp(h->name, name, h->namelength) == 0) {
             break;
         }
-
-        h = NEXT_FILE(h);
+        i++;
     }
 
     if (h->status == STATUS_EMPTY)
@@ -61,19 +61,21 @@ FILE *fopen(const char *name, const char *mode)
             os_fatal("filename max length 111 bytes");
         }
 
-        memset(h, 0, sizeof(struct fz_filehdr));
-        h->magic = MAGIC;
-//        h->length will be set as data is written
-        h->status = STATUS_APPENDING;
-        h->namelength = namelen;
-        strcpy(h->name, name);
+        struct fz_filehdr *newh = (struct fz_filehdr *) h; // non-const anymore
+        memset((void *) newh, 0, sizeof(struct fz_filehdr));
+        newh->magic = MAGIC;
+//        newh->length will be set as data is written
+        newh->status = STATUS_APPENDING;
+        newh->namelength = namelen;
+        strcpy(newh->name, name);
+        h = newh;
     }
     
     FILE * fp = malloc(sizeof(FILE));
 
     if (fp == NULL) return NULL;
 
-    fp->hdr = h;
+    fp->hdr = (struct fz_filehdr *) h;
     fp->data = ((char *) h) + sizeof(struct fz_filehdr) + h->namelength;
     fp->fpos = 0;
 

@@ -1,21 +1,12 @@
 
 #include "frotzos.h"
+#include "io.h"
 
 volatile float seconds = 0.0; // seconds since boot
 
 void enable_interrupts();
 void isr_keyboard();
 void isr_timer();
-
-static inline void outb( unsigned short port, unsigned char val ) {
-    asm volatile( "outb %0, %1" : : "a"(val), "Nd"(port) );
-}
-
-static inline unsigned char inportb(unsigned int port) {
-   unsigned char ret;
-   asm volatile ("inb %%dx,%%al":"=a" (ret):"d" (port));
-   return ret;
-}
 
 static
 void exception_handler(unsigned int excnum)
@@ -35,19 +26,19 @@ void exception_handler(unsigned int excnum)
     };
 
     if (excnum > 0x28) {        // IRQ8-15
-        outb(0xa0, 0x20);       // EOI to slave PIC
+        out8(0xa0, 0x20);       // EOI to slave PIC
     } 
 
-    outb(0x20, 0x20);       // EOI to master PIC
+    out8(0x20, 0x20);       // EOI to master PIC
 }
 
 static
 void timer_phase(int hz)
 {
     int divisor = 1193180 / hz;
-    outb(0x43, 0x36);             // Counter0, LSB then MSB, square wave
-    outb(0x40, divisor & 0xFF);   // send LSB
-    outb(0x40, divisor >> 8);     // send MSB
+    out8(0x43, 0x36);             // Counter0, LSB then MSB, square wave
+    out8(0x40, divisor & 0xFF);   // send LSB
+    out8(0x40, divisor >> 8);     // send MSB
 }
 
 void
@@ -55,17 +46,17 @@ enable_interrupts()
 {
     // set up 8259 PIC for hardware interrupts at 0x20/0x28
 
-    outb( 0x20, 0x11);  // expect ICW4
-    outb( 0x21, 0x20);  // IRQ0 is int 0x20
-    outb( 0x21, 0x04);  // slave is on IRQ2
-    outb( 0x21, 0x01);  // manual EOI
-    outb( 0x21, 0x0);   // unmask all ints
+    out8( 0x20, 0x11);  // expect ICW4
+    out8( 0x21, 0x20);  // IRQ0 is int 0x20
+    out8( 0x21, 0x04);  // slave is on IRQ2
+    out8( 0x21, 0x01);  // manual EOI
+    out8( 0x21, 0x0);   // unmask all ints
 
-    outb( 0xA0, 0x11);  // expect ICW4
-    outb( 0xA1, 0x28);  // IRQ8 is int 0x28
-    outb( 0xA1, 0x02);  // i am attached to IRQ2
-    outb( 0xA1, 0x01);  // manual EOI
-    outb( 0xA1, 0x0);   // unmask all ints
+    out8( 0xA0, 0x11);  // expect ICW4
+    out8( 0xA1, 0x28);  // IRQ8 is int 0x28
+    out8( 0xA1, 0x02);  // i am attached to IRQ2
+    out8( 0xA1, 0x01);  // manual EOI
+    out8( 0xA1, 0x0);   // unmask all ints
 
     // boot loader stage1 isr will call this function
     *(void **) 0x7df8 = (void *) &exception_handler;
@@ -89,11 +80,11 @@ void set_hw_cursor(int x, int y)
     unsigned short pos = (y-1) * 80 + x-1;
  
     // cursor LOW port to vga INDEX register
-    outb(0x3D4, 0x0F);
-    outb(0x3D5, (unsigned char)(pos & 0xFF));
+    out8(0x3D4, 0x0F);
+    out8(0x3D5, (unsigned char)(pos & 0xFF));
     // cursor HIGH port to vga INDEX register
-    outb(0x3D4, 0x0E);
-    outb(0x3D5, (unsigned char)((pos >> 8) & 0xFF));
+    out8(0x3D4, 0x0E);
+    out8(0x3D5, (unsigned char)((pos >> 8) & 0xFF));
 }
 
 void isr_timer()
@@ -124,7 +115,7 @@ int pop_scancode()
 void
 isr_keyboard()
 {
-    int scancode = inportb(0x60);
+    int scancode = in8(0x60);
 
     if ((kqback + 1) % sizeof(keyqueue) != kqfront)
     {
