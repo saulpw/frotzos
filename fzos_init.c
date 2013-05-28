@@ -4,6 +4,8 @@
 f_setup_t f_setup;
 extern char *story_name;
 
+const char *errmsg = NULL;
+
 void os_init_setup()
 {
     enable_interrupts();

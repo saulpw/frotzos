@@ -2,20 +2,12 @@
 #include "frotzos.h"
 #include "io.h"
 
-volatile float seconds = 0.0; // seconds since boot
+volatile double seconds = 0.0; // seconds since boot
 
 void enable_interrupts();
 void isr_keyboard();
 void isr_timer();
-
-static inline u32
-get_cr2()
-{
-   u32 __force_order;
-   u32 val;
-   asm volatile("mov %%cr2,%0\n\t" : "=r" (val), "=m" (__force_order));
-   return val;
-}
+extern void page_fault();
 
 static
 void exception_handler(unsigned int excnum)
@@ -25,11 +17,7 @@ void exception_handler(unsigned int excnum)
     }
 
     switch (excnum) {
-    case 0x0e: // page fault
-        os_display_num(1, 1, get_cr2(), 16);
-        halt();
-        break;
-
+    case 0x0E: page_fault(); break;
     case 0x20:  isr_timer(); break;
     case 0x21:  isr_keyboard(); break;
 
@@ -57,11 +45,13 @@ void exception_handler(unsigned int excnum)
         break;
     };
 
-    if (excnum > 0x28) {        // IRQ8-15
+    if (excnum >= 0x28) {        // IRQ8-15
         out8(0xa0, 0x20);       // EOI to slave PIC
     } 
 
-    out8(0x20, 0x20);       // EOI to master PIC
+    if (excnum >= 0x20) {
+        out8(0x20, 0x20);       // EOI to master PIC
+    }
 }
 
 static

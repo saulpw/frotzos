@@ -1,29 +1,29 @@
 #include "frotzos.h"
 #include "filehdr.h"
+#include "io.h"
 
 #define MAX_FILES 256
 
-#define NEXT_FILE(HDR) ({ \
-    const char * d = (const char *) HDR; \
-    d += sizeof(struct fz_filehdr) + HDR->namelength + HDR->length; \
-    while (*d == 0) ++d; /* skip remaining zero padding */ \
-    (struct fz_filehdr *) d; \
-})
+char * const DISK_MAP_ADDR = (char *) 0x10000000;
+
+struct fz_filehdr *files[MAX_FILES] = { 0 };
 
 struct fz_filehdr * const * enumfiles()
 {
-    static struct fz_filehdr *files[MAX_FILES] = { 0 };
-    
     if (files[0] == NULL) {
         int i=0;
 
-        char * data = (char *) 0x8000;
+        char * data = DISK_MAP_ADDR;
+
         struct fz_filehdr *h = (struct fz_filehdr *) data;
 
-        while (h->status != STATUS_EMPTY)
+        while (h->magic == MAGIC && h->status != STATUS_EMPTY)
         {
             files[i++] = h;
-            h = NEXT_FILE(h);
+
+            data += sizeof(struct fz_filehdr) + h->namelength + h->length;
+
+            h = (struct fz_filehdr *) data;
         }
         files[i] = NULL;
     }
@@ -37,7 +37,6 @@ FILE *os_path_open(const char *path, const char *mode)
 }
 
 // ----
-int disk_highwater = 0;
 
 FILE *fopen(const char *name, const char *mode)
 {
@@ -58,7 +57,8 @@ FILE *fopen(const char *name, const char *mode)
     {
         size_t namelen = strlen(name);
         if (namelen > 111) {
-            os_fatal("filename max length 111 bytes");
+            errmsg = "filename max length 111 bytes";
+            return NULL;
         }
 
         struct fz_filehdr *newh = (struct fz_filehdr *) h; // non-const anymore
@@ -73,7 +73,10 @@ FILE *fopen(const char *name, const char *mode)
     
     FILE * fp = malloc(sizeof(FILE));
 
-    if (fp == NULL) return NULL;
+    if (fp == NULL) {
+        // errno = ENOMEM;
+        return NULL;
+    }
 
     fp->hdr = (struct fz_filehdr *) h;
     fp->data = ((char *) h) + sizeof(struct fz_filehdr) + h->namelength;
@@ -84,7 +87,7 @@ FILE *fopen(const char *name, const char *mode)
 
 int fclose(FILE *fp)
 {
-    disk_highwater += fp->fpos;
+    // TODO: write out file
     fp->hdr->length = fp->fpos;
     fp->hdr->status = STATUS_EXISTING;
     free(fp);
@@ -117,11 +120,20 @@ int fputc(int c, FILE *fp)
 int fseek(FILE *stream, long offset, int whence)
 {
     if (whence == SEEK_SET) {
+        if (offset > (long) stream->hdr->length) {
+            return -1;
+        }
         stream->fpos = offset;
     } else if (whence == SEEK_CUR) {
+        if (stream->fpos + offset > stream->hdr->length) {
+            return -1;
+        }
         stream->fpos += offset;
     } else if (whence == SEEK_END) {
-        assert((unsigned long) offset <= stream->hdr->length);
+        if (offset > (long) stream->hdr->length) {
+            return -1;
+        }
+
         stream->fpos = stream->hdr->length - offset;
     }
 
@@ -148,12 +160,20 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     size_t n = size*nmemb;
+
+    if (stream->fpos + n > stream->hdr->length) {
+        if (stream->hdr->status != STATUS_APPENDING) {
+            return 0;
+        }
+
+        stream->data = realloc(stream->data, stream->fpos + n);
+        stream->hdr->length = stream->fpos + n;
+    }
+
     memcpy(&stream->data[stream->fpos], ptr, n);
-    stream->hdr->length += n;
     stream->fpos += n;
 
-    assert(stream->hdr->length == stream->fpos);
-    return n;
+    return n / size;
 }
 
 int ferror(FILE *stream)

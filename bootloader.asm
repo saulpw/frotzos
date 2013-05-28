@@ -1,6 +1,6 @@
 ; compile with nasm, use as disk image to qemu-system-i386
 
-%define DEBUG 0
+%define DEBUG 1
 
 [BITS 16]
 [ORG 0x7c00]
@@ -165,7 +165,7 @@ GDT    dw 0x20                      ; limit of 4 entries
 gdtCS  dd 0x0000ffff, 0x00CF9A00    ; 0x08
 gdtDS  dd 0x0000ffff, 0x00CF9200    ; 0x10
 gdtGS  dd 0x70000bff, 0x00CF9200    ; 0x18, TLS
-gdtTSS dd 0x7e000067, 0x00008800    ; 0x20
+;gdtTSS dd 0x7e000067, 0x00008800    ; 0x20
 
 protmain:
     mov ax, 0x10
@@ -225,10 +225,10 @@ nextinthandler:
     rep stosd
 
     mov dword [0x3000], 0x4003  ; PT0
-    mov dword [0x3ffc], 0x3001  ; entire pagetable itself
+    mov dword [0x3ffc], 0x3003  ; entire pagetable itself
 
     mov edi, 0x4004      ; skip first page (null ptr)
-    mov ecx, 0x3ff       ; 0x1000/4 - 1
+    mov ecx, 0x0ff       ; first megabyte only (0x400/4 - 1)
     mov eax, 0x1003      ; identity map; 3 = RW | PRESENT
 nextpage:
     stosd
@@ -244,8 +244,6 @@ nextpage:
     add al, [0x800f]     ; + filename size
 
     jmp eax              ; kernel starts immediately
-
-isrESP dd 0x00002000
 
 ; <= 16 bytes for the stub
 stage0isr:
@@ -316,10 +314,11 @@ printit:
     ret
 %endif
 
-    times (512 - $ + entry - 8) db 0 ; pad boot sector with zeroes
+    times (512 - $ + entry - 12) db 0 ; pad boot sector with zeroes
 
-isr2 dd exception_halt       ; ISRstage2(intnum): [0x7DF8] = stage func ptr
-     dw 0x00                 ; 'reserved'
+isrESP dd 0x00002000           ; ISR sp at [0x7DF4]
+isr2   dd exception_halt       ; ISRstage2(intnum): [0x7DF8] = stage func ptr
+       dw 0x00                 ; 'reserved'
 
-     db 0x55, 0xAA ; 2 byte boot signature
+       db 0x55, 0xAA ; 2 byte boot signature
 

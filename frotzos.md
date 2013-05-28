@@ -52,26 +52,25 @@ can zero-pad between end of file and the next ELIF sync marker for alignment.
 ## physical 
 
 (page 0) 0x00000 - 0x007ff: real mode IDT and bios data
-         0x  800 - 0x  9ff: bootloader IDT (64 entries)
-(page 1) 0x01000 - 0x013ff: ISR stage0 stubs
-         0x01400 - 0x01fff: exception stack (grows down)
+         0x 1000 - 0x 11ff: bootloader IDT (64 entries)
+(page 1) 0x01200 - 0x015ff: ISR stage0 stubs
+                 - 0x01fff: exception stack (grows down)
 (page 2)                  :
 (page 3)                  : PDE
 (page 4)                  : PT0
-(page 5)                  : 'application' stack (grows down)
-(page 6) 0x06000 - 0x06fff: PDE
-
+(page 5)                  : application/kernel stack (grows down)
+(page 6)
 (page 7) 0x07000 - 0x07bff: TLS (gs register)
          0x07c00 - 0x07dff: boot sector
          0x07e00 - 0x07e67: TSS
 (page 8+) 0x08000 - 0x90000: disk sectors 1-? kernel loaded by bootloader
+         0x100000-0xf00000: 14MB free pages to allocate
 
 ## virtual
 
 0x0000: not present (to catch null references)
-0x1000-4MB:  identity mapped (kernel, stack, video memory)
-0x10000000- : ide0 mmap
-
-0xfffc0000: all page tables
+0x1000-1MB:  1MB identity mapped (kernel, stack, heap, video memory)
+0x10000000-0xf0000000 : ide0 mmap
+0xffc00000: all page tables
 0xfffff000: page dir itself
 

@@ -21,9 +21,8 @@ SECTIONS
         *(.data)
     }
 
-    .bss :
+    .bss ALIGN (0x04) :
     {
-        . = 0x100000;
         START_BSS = .;
         *(COMMON)
         *(.bss)

@@ -4,10 +4,12 @@
 #include <string.h>
 #include "frotz.h"
 
-extern volatile float seconds; // second since start
+extern volatile double seconds; // second since start
 
 extern int cursor_x, cursor_y, current_color;
 extern volatile char _TEXTMODE_BUFFER[];
+
+extern const char *errmsg;
 
 static inline volatile char * screenpos(int x, int y) {
     int pos = (y-1) * 80 + x-1;

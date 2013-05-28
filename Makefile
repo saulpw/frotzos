@@ -14,14 +14,17 @@ MALLOC_CFLAGS= -O3 -DLACKS_UNISTD_H -DLACKS_FCNTL_H -DLACKS_SYS_PARAM_H  \
 -DLACKS_SCHED_H -DLACKS_TIME_H -Dmalloc_getpagesize=4096 -DHAVE_MMAP=0   \
 -DMALLOC_FAILURE_ACTION='abort()' -DENOMEM=12 -DEINVAL=22
 
-FZ_OBJS := fzos_display.o    \
+FZ_OBJS := \
+		fzos_display.o    \
 		fzos_file.o       \
 		fzos_hw.o         \
 		fzos_init.o       \
 		fzos_input.o      \
 		fzos_mem.o        \
+		fzos_paging.o     \
 		fzos_readline.o   \
 		fzos_string.o     \
+		ata.o             \
 		debug.o           \
 		malloc.o
 
@@ -55,7 +58,7 @@ bootloader.bin: bootloader.asm
 
 %.img: %.simplefs bootloader.bin frotz.elf
 	cat bootloader.bin $< > $@
-	truncate $@ --size=%1K
+	truncate $@ --size=%8K
 
 clean:
 	make -C $(FROTZDIR) clean

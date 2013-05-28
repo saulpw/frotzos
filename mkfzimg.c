@@ -85,12 +85,6 @@ main(int argc, char * const argv[])
             n += nwritten;
         }
 
-        if (n & 0x0f) { // needs alignment
-            size_t rn = (n + 16) & ~0x0f;
-            char zbuf[16] = { 0 };
-            fwrite(zbuf, 1, rn - n, fpout); // pad with zeroes
-        }
-
         fclose(fpin);
         fprintf(stderr, "\n");
     }
