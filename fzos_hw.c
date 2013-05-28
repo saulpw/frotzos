@@ -8,21 +8,53 @@ void enable_interrupts();
 void isr_keyboard();
 void isr_timer();
 
+static inline u32
+get_cr2()
+{
+   u32 __force_order;
+   u32 val;
+   asm volatile("mov %%cr2,%0\n\t" : "=r" (val), "=m" (__force_order));
+   return val;
+}
+
 static
 void exception_handler(unsigned int excnum)
 {
-    if (excnum < 0x20) {        // processor exception
-        halt();                 // noreturn
-    }
-
     if (excnum >= 0x30) {       // future syscalls
         return;
     }
 
     switch (excnum) {
-    case 0x20:  isr_timer(); break; // timer
-    case 0x21:  isr_keyboard(); break; // keyboard
-    default: break;
+    case 0x0e: // page fault
+        os_display_num(1, 1, get_cr2(), 16);
+        halt();
+        break;
+
+    case 0x20:  isr_timer(); break;
+    case 0x21:  isr_keyboard(); break;
+
+    case 0x00: // divide-by-zero
+    case 0x01: // debug
+    case 0x02: // NMI
+    case 0x03: // breakpoint
+    case 0x04: // overflow
+    case 0x05: // bound range exceeded
+    case 0x06: // invalid opcode
+    case 0x07: // device not available
+    case 0x08: // double fault
+    case 0x09: // coprocessor segment overrun
+    case 0x0a: // invalid tss
+    case 0x0b: // segment not present
+    case 0x0c: // stack-segment fault
+    case 0x0d: // gpf
+    case 0x10: // x87 fpe
+    case 0x11: // alignment check
+    case 0x12: // machine check
+    case 0x13: // simd fpe
+    case 0x1e: // security exception
+    default:
+        halt();
+        break;
     };
 
     if (excnum > 0x28) {        // IRQ8-15
@@ -39,6 +71,36 @@ void timer_phase(int hz)
     out8(0x43, 0x36);             // Counter0, LSB then MSB, square wave
     out8(0x40, divisor & 0xFF);   // send LSB
     out8(0x40, divisor >> 8);     // send MSB
+}
+
+static inline void a20wait()
+{
+    while (in8(0x64) & 0x2)
+        ;
+}
+
+static inline void a20wait2()
+{
+    while (! (in8(0x64) & 0x1))
+        ;
+}
+
+void
+enable_A20()
+{
+    a20wait();
+    out8(0x64, 0xad);
+    a20wait();
+    out8(0x64, 0xd0);
+    a20wait2();
+    int r = in8(0x60);
+    a20wait();
+    out8(0x64, 0xd1);
+    a20wait();
+    out8(0x60, r | 0x2);
+    a20wait();
+    out8(0x64, 0xae);
+    a20wait();
 }
 
 void
@@ -141,5 +203,4 @@ unsigned long long rdtsc(void)
     asm volatile (".byte 0x0f, 0x31" : "=A" (x));
     return x;
 }
-
 

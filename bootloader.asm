@@ -22,23 +22,6 @@ resetdisk:
     jc resetdisk
     ret
 
-a20wait:
-    in al,0x64
-    test al,2
-    jnz a20wait
-    ret
-
-a20wait2:
-    in al,0x64
-    test al,1
-    jz a20wait2
-    ret
-
-parmserr:
-    mov al, '&'
-    call putc
-    hlt
-
 retries     db 10   ; max 10 retries until fail
 current_lba dw 1    ; starting sector (skip boot sector)
 
@@ -48,36 +31,6 @@ start:
     mov ds, ax
     mov ss, ax
     mov sp, 0x7c00      ; just before the code
-
-enable_A20: ; from wiki.osdev.org
-    call a20wait
-    mov al,0xAD
-    out 0x64,al
-
-    call a20wait
-    mov al,0xD0
-    out 0x64,al
-
-    call a20wait2
-    in al,0x60
-    push eax
-
-    call a20wait
-    mov al,0xD1
-    out 0x64,al
-
-    call a20wait
-    pop eax
-    or al,2
-    out 0x60,al
-
-    call a20wait
-    mov al,0xAE
-    out 0x64,al
-
-    call a20wait
-
-; A20 enabled
 
     call resetdisk
 
@@ -93,8 +46,13 @@ enable_A20: ; from wiki.osdev.org
     mov BOOT_DRIVE, dl   ; save off boot drive before 13/08 trashes it
     mov ah, 0x08
     int 0x13
-    jc parmserr
+    jnc parmsok
 
+    mov al, '&'
+    call putc
+    hlt
+
+parmsok:
     mov word PARA_PER_SECTOR, 0x20 ; 512 bytes/sector is 32 paragraphs
 
 ; set up parameters for LBAtoCHS
@@ -193,8 +151,8 @@ leap:
 ; --- protected mode ---
 [bits 32]
 
-NUM_INTS     equ 64
-IDT_ADDR     equ 0x800
+NUM_INTS     equ 64                 ; exceptions/interrupts available (0-0x3f)
+IDT_ADDR     equ 0x1000
 HANDLER_ADDR equ IDT_ADDR + (NUM_INTS * 8)
 
 IDTR   dw NUM_INTS*8-1              ; limit
@@ -204,9 +162,10 @@ GDT    dw 0x20                      ; limit of 4 entries
        dd GDT                       ; linear address of GDT
        dw 0
         ; 0xBBBBLLLL, 0xBBFLAABB    ; F = GS00b, AA = 1001XDW0
-gdtCS  dd 0x0000ffff, 0x00CF9A00    ; 0x08h
-gdtDS  dd 0x0000ffff, 0x00CF9200    ; 0x10h
-gdtTSS dd 0x10000067, 0x00008800    ; 0x18h
+gdtCS  dd 0x0000ffff, 0x00CF9A00    ; 0x08
+gdtDS  dd 0x0000ffff, 0x00CF9200    ; 0x10
+gdtGS  dd 0x70000bff, 0x00CF9200    ; 0x18, TLS
+gdtTSS dd 0x7e000067, 0x00008800    ; 0x20
 
 protmain:
     mov ax, 0x10
@@ -214,9 +173,12 @@ protmain:
     mov ss, ax
     mov es, ax
     mov fs, ax
+
+    mov ax, 0x18          ; for the TLS segment (-mno-tls-direct-seg-refs)
+;    mov fs, ax           ; would be needed for 64-bit TLS
     mov gs, ax
 
-;    mov ax, 0x18
+;    mov ax, 0x20
 ;    ltr ax               ; TSS descriptor
 ;    xor eax, eax
 ;    lldt ax              ; no LDT
@@ -224,8 +186,8 @@ protmain:
     mov esp, 0x6000      ; data stack grows down
 
 ; create IDT entries, incrementing the stub address
-    mov edi, [idtptr]   ; IDT from 0x800 - 0x9FF
-    mov ecx, NUM_INTS   ; interrupts available (0-0x3f)
+    mov edi, [idtptr]
+    mov ecx, NUM_INTS
     mov eax, 0x00080000 + HANDLER_ADDR ; CS=0x08; IP[15:0] = 0x0200 (+ 16*interrupt#)
     mov edx, 0x00008E00 ; IP[31:16] = 0; type=0x8E (32-bit int gate); reserved=0
 nextidtentry:
@@ -237,7 +199,7 @@ nextidtentry:
     loop nextidtentry
 
 ; copy stage0isr stub, increasing the K in its 'push K'
-;    mov edi, HANDLER_ADDR      ; interrupt handlers are at 0xA00 - 0xDFF
+    mov edi, HANDLER_ADDR
     mov ecx, NUM_INTS
     mov al, 0
 nextinthandler:
@@ -252,8 +214,35 @@ nextinthandler:
 
     lidt [IDTR]
 
+; set up page tables
+    ; page directory at 0x6000-0x6fff
+    mov eax, 0x3000
+    mov cr3, eax
+
+    mov edi, eax      ; bzero page dir and PT0
+    mov ecx, 0x2000/4
+    xor eax, eax
+    rep stosd
+
+    mov dword [0x3000], 0x4003  ; PT0
+    mov dword [0x3ffc], 0x3001  ; entire pagetable itself
+
+    mov edi, 0x4004      ; skip first page (null ptr)
+    mov ecx, 0x3ff       ; 0x1000/4 - 1
+    mov eax, 0x1003      ; identity map; 3 = RW | PRESENT
+nextpage:
+    stosd
+    add eax, 0x1000
+    loop nextpage
+
+    ; turn on paging
+    mov eax, cr0
+    or eax, 0x80000000
+    mov cr0, eax
+
     mov eax, 0x8010      ; after 16-byte FILE header
     add al, [0x800f]     ; + filename size
+
     jmp eax              ; kernel starts immediately
 
 isrESP dd 0x00002000
@@ -324,20 +313,6 @@ hex4:
 printit:
     mov ah, 0x0F
     stosw
-    ret
-
-; move string at esi, to vidmem at edi
-dispstring:
-    push eax
-    mov ah, 0x07
-
-nextchar:
-    lodsb
-    stosw
-    or al, al
-    jnz nextchar
-
-    pop eax
     ret
 %endif
 
