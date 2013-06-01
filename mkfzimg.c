@@ -89,6 +89,14 @@ main(int argc, char * const argv[])
         fprintf(stderr, "\n");
     }
 
+    // extend file to be a multiple of 4k
+
+    char buf[4096] = { 0 };
+    int nwritten = ftell(fpout);
+    int totaln = (nwritten + 4096) & ~0xfff;
+    fprintf(stderr, "extending by %d bytes to multiple of 4k\n", totaln - nwritten);
+    fwrite(buf, 1, totaln - nwritten, fpout);
+
     fclose(fpout);
 
     return 0;

@@ -58,7 +58,6 @@ bootloader.bin: bootloader.asm
 
 %.img: %.simplefs bootloader.bin frotz.elf
 	cat bootloader.bin $< > $@
-	truncate $@ --size=%8K
 
 clean:
 	make -C $(FROTZDIR) clean

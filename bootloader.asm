@@ -1,6 +1,6 @@
 ; compile with nasm, use as disk image to qemu-system-i386
 
-%define DEBUG 1
+%define DEBUG 0
 
 [BITS 16]
 [ORG 0x7c00]
