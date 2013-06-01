@@ -1,11 +1,9 @@
 #ifndef _IO_H_
 #define _IO_H_
 
-// x86 hardware I/O primitives
+#include <sys/types.h>
 
-typedef unsigned char u8;
-typedef unsigned short u16;
-typedef unsigned int u32;
+// x86 hardware I/O primitives
 
 static inline void
 out8(unsigned short port, u8 val)
