@@ -1,58 +1,45 @@
 
 #include "frotzos.h"
 #include "io.h"
+#include "vgatext.h"
+
+#define TIMER_HZ 100
 
 volatile double seconds = 0.0; // seconds since boot
 
 void enable_interrupts();
 void isr_keyboard();
 void isr_timer();
-extern void page_fault();
+extern void page_fault(u32 errcode);
 
-static
-void exception_handler(unsigned int excnum)
+void unhandled_irq(u32 irq)
 {
-    if (excnum >= 0x30) {       // future syscalls
-        return;
-    }
+    kprintf("Unhandled IRQ%d\r\n", irq);
+}
 
-    switch (excnum) {
-    case 0x0E: page_fault(); break;
-    case 0x20:  isr_timer(); break;
-    case 0x21:  isr_keyboard(); break;
-
-    case 0x00: // divide-by-zero
-    case 0x01: // debug
-    case 0x02: // NMI
-    case 0x03: // breakpoint
-    case 0x04: // overflow
-    case 0x05: // bound range exceeded
-    case 0x06: // invalid opcode
-    case 0x07: // device not available
-    case 0x08: // double fault
-    case 0x09: // coprocessor segment overrun
-    case 0x0a: // invalid tss
-    case 0x0b: // segment not present
-    case 0x0c: // stack-segment fault
-    case 0x0d: // gpf
-    case 0x10: // x87 fpe
-    case 0x11: // alignment check
-    case 0x12: // machine check
-    case 0x13: // simd fpe
-    case 0x1e: // security exception
-    default:
-        halt();
-        break;
+void unhandled(u32 excnum, u32 errcode,
+               u32 edi, u32 esi, u32 ebp, u32 esp,
+               u32 ebx, u32 edx, u32 ecx, u32 new_eax,
+               u32 eax, u32 eip, u32 cs, u32 eflags)
+{
+#ifdef DEBUG
+    static const char *exc_names[] = {
+        "divide-by-zero", "debug", "NMI", "breakpoint",
+        "overflow", "bounds", "invalid opcode", "device n/a",
+        "double fault", "coproc", "invalid tss", "segment not present",
+        "stack-segment", "GPF", "page fault", "reserved",
+        "x87 fpe", "alignment", "machine check", "simd fpe",
     };
 
-    if (excnum >= 0x28) {        // IRQ8-15
-        out8(0xa0, 0x20);       // EOI to slave PIC
-    } 
+    kprintf("Unhandled exception %d (%s): eip=0x%x\r\n", excnum, exc_names[excnum], eip);
+#endif
 
-    if (excnum >= 0x20) {
-        out8(0x20, 0x20);       // EOI to master PIC
-    }
+    halt();
 }
+
+void *exc_handlers[32] = { unhandled };
+void *irq_handlers[16] = { unhandled_irq };
+
 
 static
 void timer_phase(int hz)
@@ -94,6 +81,32 @@ enable_A20()
 }
 
 void
+exception_handler(int n)
+{
+    if (n >= 0x20) {
+        void (*h)(int);
+        h = irq_handlers[n - 0x20];
+        h(n - 0x20);
+        if (n >= 0x28) out8(0xa0, 0x20);
+        if (n >= 0x20) out8(0x20, 0x20);
+    } else {
+        void (*h)(int, int);
+        h = exc_handlers[n];
+        h(n, 0);
+    }
+}
+
+void
+set_exception(int excnum, void *codeptr)
+{
+#if 1
+    u32 *idt = (u32 *) 0x1000;
+    idt[excnum*2] = 0x00080000 | (((u32) codeptr) & 0x0000ffff);
+    idt[excnum*2 + 1] = 0x00008E00 | (((u32) codeptr) & 0xffff0000);
+#endif
+}
+
+void
 enable_interrupts()
 {
     // set up 8259 PIC for hardware interrupts at 0x20/0x28
@@ -110,11 +123,53 @@ enable_interrupts()
     out8( 0xA1, 0x01);  // manual EOI
     out8( 0xA1, 0x0);   // unmask all ints
 
-    // boot loader stage1 isr will call this function
-    *(void **) 0x7df8 = (void *) &exception_handler;
-
     // call timer isr at 100hz
-    timer_phase(100);
+    timer_phase(TIMER_HZ);
+
+#define EXCEPTION(N, FUNC) \
+    extern void *asm_exc##N; \
+    set_exception(N, &asm_exc##N); \
+    exc_handlers[N] = FUNC;
+
+    EXCEPTION(0, unhandled);
+    EXCEPTION(1, unhandled);
+    EXCEPTION(2, unhandled);
+    EXCEPTION(3, unhandled);
+    EXCEPTION(4, unhandled);
+    EXCEPTION(5, unhandled);
+    EXCEPTION(6, unhandled);
+    EXCEPTION(7, unhandled);
+    EXCEPTION(8, unhandled);
+    EXCEPTION(9, unhandled);
+    EXCEPTION(10, unhandled);
+    EXCEPTION(11, unhandled);
+    EXCEPTION(12, unhandled);
+    EXCEPTION(13, unhandled);
+    EXCEPTION(14, page_fault);
+
+#define IRQ(N, FUNC) \
+    extern void *asm_irq##N; \
+    set_exception(0x20 + N, &asm_irq##N); \
+    irq_handlers[N] = FUNC;
+
+    IRQ(0, isr_timer);
+    IRQ(1, isr_keyboard);
+    IRQ(2, unhandled);
+    IRQ(3, unhandled);
+    IRQ(4, unhandled);
+    IRQ(5, unhandled);
+    IRQ(6, unhandled);
+    IRQ(7, unhandled);
+    IRQ(8, unhandled);
+    IRQ(9, unhandled);
+    IRQ(10, unhandled);
+    IRQ(11, unhandled);
+    IRQ(12, unhandled);
+    IRQ(13, unhandled);
+    IRQ(14, unhandled);
+    IRQ(15, unhandled);
+
+    *(u32 *) 0x7df8 = (u32) exception_handler;
 
     // enable interrupts on processor
     asm volatile ("sti");
@@ -122,29 +177,16 @@ enable_interrupts()
 
 void setch(int x, int y, char ch, char attr)
 {
-    volatile char *pos = screenpos(x, y);
-    pos[0] = ch;
-    pos[1] = attr;
-}
-
-void set_hw_cursor(int x, int y)
-{
-    unsigned short pos = (y-1) * 80 + x-1;
- 
-    // cursor LOW port to vga INDEX register
-    out8(0x3D4, 0x0F);
-    out8(0x3D5, (unsigned char)(pos & 0xFF));
-    // cursor HIGH port to vga INDEX register
-    out8(0x3D4, 0x0E);
-    out8(0x3D5, (unsigned char)((pos >> 8) & 0xFF));
+    vga_charptr(x, y)[0] = ch;
+    vga_charptr(x, y)[1] = attr;
 }
 
 void isr_timer()
 {
-    seconds += .01;
+    seconds += (1.0 / TIMER_HZ);
 
     static const char spinny[] = "\\|/-";
-    screenpos(80, 1)[0] = spinny[(int) (seconds) % (sizeof(spinny)-1)];
+    vga_charptr(80, 1)[0] = spinny[(int) (seconds) % (sizeof(spinny)-1)];
 }
 
 extern void key_released(int sc);

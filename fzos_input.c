@@ -1,4 +1,5 @@
 #include "frotzos.h"
+#include "vgatext.h"
 
 #define TAB ZC_INDENT // 9
 #define ENTER ZC_RETURN // 13
@@ -57,7 +58,7 @@ int
 read_key (int timeout, int show_cursor, int readline)
 {
     if (show_cursor)
-        set_hw_cursor(cursor_x, cursor_y);
+        vga_set_cursor(cursor_x, cursor_y);
 
     const float endseconds = seconds + ((float) timeout)/10;
 

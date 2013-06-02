@@ -20,6 +20,7 @@ MALLOC_CFLAGS= -O3 -DLACKS_UNISTD_H -DLACKS_FCNTL_H -DLACKS_SYS_PARAM_H  \
 -DMALLOC_FAILURE_ACTION='abort()' -DENOMEM=12 -DEINVAL=22
 
 FZ_OBJS := \
+		exceptions.o      \
 		fzos_display.o    \
 		fzos_file.o       \
 		fzos_hw.o         \
@@ -30,9 +31,10 @@ FZ_OBJS := \
 		fzos_readline.o   \
 		fzos_string.o     \
 		ata.o             \
-		debug.o           \
 		kprintf.o         \
+		ksyscall.o        \
 		serial.o          \
+		vgatext.o         \
 		malloc.o
 
 # if you have LostPig.z8, 'make LostPig.img'
@@ -65,6 +67,9 @@ malloc.o: malloc.c
 
 bootloader.bin: bootloader.asm
 	nasm $(ASMFLAGS) -f bin -l $@.list -o $@ $<
+
+.s.o:
+	nasm $(ASMFLAGS) -f elf -o $@ $<
 
 %.simplefs:	%.z5 mkfzimg frotz.bin
 	./mkfzimg -o $@ frotz.bin $<

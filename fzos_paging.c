@@ -27,12 +27,14 @@ u32 get_phys_page()
 }
 
 void
-page_fault()
+page_fault(int errcode)
 {
     u32 faultaddr = get_cr2();
+#if 0
     u32 *app_esp = (u32 *) 0x7DF4;
     u32 errcode = *((u32 *) *app_esp);
     *app_esp += 0x4; // remove error code
+#endif
 
     if (faultaddr < 0x100000) {
         os_fatal("lower 1MB page fault");

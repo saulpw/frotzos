@@ -1,4 +1,5 @@
 #include "frotzos.h"
+#include "vgatext.h"
 
 int cursor_x=1, cursor_y=24;
 int current_color = 0x17;
@@ -186,7 +187,7 @@ void os_scroll_area (int top, int left, int bot, int right, int units)
 {
     int y;
     for (y=top; y <= bot; ++y) {
-        memcpy((void *) screenpos(left, y), (void *) screenpos(left, y+units), (right-left)*2+2);
+        memcpy((void *) vga_charptr(left, y), (void *) vga_charptr(left, y+units), (right-left)*2+2);
         os_erase_area(y+units, left, y+units, right);
     }
 }

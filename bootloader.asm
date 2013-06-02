@@ -213,7 +213,6 @@ nextinthandler:
     lidt [IDTR]
 
 ; set up page tables
-    ; page directory at 0x6000-0x6fff
     mov eax, 0x3000
     mov cr3, eax
 

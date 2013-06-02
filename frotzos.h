@@ -7,14 +7,8 @@
 extern volatile double seconds; // second since start
 
 extern int cursor_x, cursor_y, current_color;
-extern volatile char _TEXTMODE_BUFFER[];
 
 extern const char *errmsg;
-
-static inline volatile char * screenpos(int x, int y) {
-    int pos = (y-1) * 80 + x-1;
-    return (volatile void *) &_TEXTMODE_BUFFER[pos*2];
-}
 
 // get the array of filenames
 extern struct fz_filehdr * const * enumfiles();
@@ -34,14 +28,14 @@ extern void enable_interrupts();
 extern unsigned long long rdtsc(void);
 
 // debug functions
-#define NOTIMPL TRACE(NOTIMPL)
-#define TRACE(X) trace(__FUNCTION__, __FILE__, __LINE__, #X)
+#define NOTIMPL TRACE("NOT IMPLEMENTED")
+
+#define TRACE(FMT, args...) DEBUG("%s [%s:%d] " FMT "\r\n", __FUNCTION__, __FILE__, __LINE__, ##args)
 
 #ifndef DEBUG
 #define DEBUG(args...)
 #endif
 
-extern void trace(const char *func, const char *fn, int line, const char *note);
 extern void os_display_num(int x, int y, int n, int base);
 extern void kprintf(const char *fmt, ...);
 
