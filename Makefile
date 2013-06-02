@@ -21,6 +21,7 @@ MALLOC_CFLAGS= -O3 -DLACKS_UNISTD_H -DLACKS_FCNTL_H -DLACKS_SYS_PARAM_H  \
 
 FZ_OBJS := \
 		exceptions.o      \
+		idt.o      \
 		fzos_display.o    \
 		fzos_file.o       \
 		fzos_hw.o         \

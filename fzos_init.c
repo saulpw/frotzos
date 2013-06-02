@@ -8,8 +8,6 @@ const char *errmsg = NULL;
 
 void os_init_setup()
 {
-    enable_interrupts();
-
     f_setup.attribute_assignment = 0;
 	f_setup.attribute_testing = 0;
 	f_setup.context_lines = 0;

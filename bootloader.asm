@@ -149,21 +149,14 @@ leap:
 ; --- protected mode ---
 [bits 32]
 
-NUM_INTS     equ 64                 ; exceptions/interrupts available (0-0x3f)
-IDT_ADDR     equ 0x1000
-HANDLER_ADDR equ IDT_ADDR + (NUM_INTS * 8)
-
-IDTR   dw NUM_INTS*8-1              ; limit
-idtptr dd IDT_ADDR                  ; linear address of IDT
-
-GDT    dw 0x20                      ; limit of 4 entries
+GDT    dw 0x28                      ; limit of 5 entries
        dd GDT                       ; linear address of GDT
        dw 0
         ; 0xBBBBLLLL, 0xBBFLAABB    ; F = GS00b, AA = 1001XDW0
 gdtCS  dd 0x0000ffff, 0x00CF9A00    ; 0x08
 gdtDS  dd 0x0000ffff, 0x00CF9200    ; 0x10
-gdtGS  dd 0x70000bff, 0x00CF9200    ; 0x18, TLS
-;gdtTSS dd 0x7e000067, 0x00008800    ; 0x20
+gdtGS  dd 0x70000bff, 0x00CF9200    ; 0x18, TLS at 0x07000-0x07bff
+gdtTSS dd 0x7e000067, 0x00008900    ; 0x20, TSS at 0x07E00-0x07E67
 
 protmain:
     mov ax, 0x10
@@ -173,44 +166,15 @@ protmain:
     mov fs, ax
 
     mov ax, 0x18          ; for the TLS segment (-mno-tls-direct-seg-refs)
-;    mov fs, ax           ; would be needed for 64-bit TLS
     mov gs, ax
+;    mov fs, ax           ; would be needed instead for 64-bit TLS
 
-;    mov ax, 0x20
-;    ltr ax               ; TSS descriptor
-;    xor eax, eax
-;    lldt ax              ; no LDT
+    mov ax, 0x20
+    ltr ax               ; TSS descriptor
+    xor eax, eax
+    lldt ax              ; no LDT
 
     mov esp, 0x6000      ; data stack grows down
-
-; create IDT entries, incrementing the stub address
-    mov edi, [idtptr]
-    mov ecx, NUM_INTS
-    mov eax, 0x00080000 + HANDLER_ADDR ; CS=0x08; IP[15:0] = 0x0200 (+ 16*interrupt#)
-    mov edx, 0x00008E00 ; IP[31:16] = 0; type=0x8E (32-bit int gate); reserved=0
-nextidtentry:
-    stosd
-    xchg eax, edx
-    stosd
-    xchg eax, edx
-    add eax, 0x0010     ; exception stub <=16 bytes
-    loop nextidtentry
-
-; copy stage0isr stub, increasing the K in its 'push K'
-    mov edi, HANDLER_ADDR
-    mov ecx, NUM_INTS
-    mov al, 0
-nextinthandler:
-    mov esi, stage0isr
-    movsd
-    movsd
-    movsd
-    movsd
-    inc al
-    mov [esi-16 + 7], al
-    loop nextinthandler
-
-    lidt [IDTR]
 
 ; set up page tables
     mov eax, 0x3000
@@ -242,80 +206,7 @@ nextpage:
 
     jmp eax              ; kernel starts immediately
 
-; <= 16 bytes for the stub
-stage0isr:
-    xchg esp, [isrESP]
-    push 0
-    jmp [isr1] ; weird indirect jmp because i can't figure out how to force
-               ;   nasm to generate an absolute jmp to a label
-
-isr1    dd stage1isr            ; ISR stage 1 -- keep as assembly
-
-stage1isr:
-    xchg eax, [esp]
-
-    pushad
-
-%ifdef DEBUG
-    ; DEBUG: display interrupt#
-    push eax
-    mov edi, 0xb8000 + 160 + 156
-    shl eax, 2
-    add edi, eax
-    shr eax, 2
-    call hex8
-    pop eax
-%endif
-
-    push eax              ; interrupt # is argument
-    call [isr2]
-    pop eax
-
-    popad
-
-    pop eax
-    xchg esp, [isrESP]
-    iret
-
-exception_halt: ; instead of iret, but restore state for easier debugging
-%ifdef DEBUG
-    pop eax     ; remove ret address from call [isr2]
-    pop eax     ; remove exception number parameter
-    popad
-    pop eax     ; original eax
-    xchg esp, [isrESP]
-%endif
-_halt:
-    hlt
-    jmp _halt
-
-
-%ifdef DEBUG
-hex8:
-    mov bl, al
-    shr al, 4
-    call hex4
-    mov al, bl
-;    call hex4
-;    ret
-
-hex4:
-    and al, 0x0f
-    add al, '0'
-    cmp al, '9'
-    jle printit
-    add al, 'A' - '0' - 10
-printit:
-    mov ah, 0x0F
-    stosw
-    ret
-%endif
-
-    times (512 - $ + entry - 12) db 0 ; pad boot sector with zeroes
-
-isrESP dd 0x00002000           ; ISR sp at [0x7DF4]
-isr2   dd exception_halt       ; ISRstage2(intnum): [0x7DF8] = stage func ptr
-       dw 0x00                 ; 'reserved'
+    times (512 - $ + entry - 2) db 0 ; pad boot sector with zeroes
 
        db 0x55, 0xAA ; 2 byte boot signature
 

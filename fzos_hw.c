@@ -4,10 +4,11 @@
 #include "vgatext.h"
 
 #define TIMER_HZ 100
+#define IDT_BASE ((void *) 0x1000)
 
 volatile double seconds = 0.0; // seconds since boot
 
-void enable_interrupts();
+void setup_interrupts(void *idtaddr);
 void isr_keyboard();
 void isr_timer();
 extern void page_fault(u32 errcode);
@@ -37,9 +38,23 @@ void unhandled(u32 excnum, u32 errcode,
     halt();
 }
 
-void *exc_handlers[32] = { unhandled };
-void *irq_handlers[16] = { unhandled_irq };
+void *exc_handlers[32] = { 
+    unhandled, unhandled, unhandled, unhandled,
+    unhandled, unhandled, unhandled, unhandled,
+    unhandled, unhandled, unhandled, unhandled,
+    unhandled, unhandled, page_fault, unhandled,
+    unhandled, unhandled, unhandled, unhandled,
+    unhandled, unhandled, unhandled, unhandled,
+    unhandled, unhandled, unhandled, unhandled,
+    unhandled, unhandled, unhandled, unhandled,
+};
 
+void *irq_handlers[16] = {
+    isr_timer, isr_keyboard, unhandled_irq, unhandled_irq,
+    unhandled_irq, unhandled_irq, unhandled_irq, unhandled_irq,
+    unhandled_irq, unhandled_irq, unhandled_irq, unhandled_irq,
+    unhandled_irq, unhandled_irq, unhandled_irq, unhandled_irq,
+};
 
 static
 void timer_phase(int hz)
@@ -81,98 +96,11 @@ enable_A20()
 }
 
 void
-exception_handler(int n)
+init_kernel()
 {
-    if (n >= 0x20) {
-        void (*h)(int);
-        h = irq_handlers[n - 0x20];
-        h(n - 0x20);
-        if (n >= 0x28) out8(0xa0, 0x20);
-        if (n >= 0x20) out8(0x20, 0x20);
-    } else {
-        void (*h)(int, int);
-        h = exc_handlers[n];
-        h(n, 0);
-    }
-}
-
-void
-set_exception(int excnum, void *codeptr)
-{
-#if 1
-    u32 *idt = (u32 *) 0x1000;
-    idt[excnum*2] = 0x00080000 | (((u32) codeptr) & 0x0000ffff);
-    idt[excnum*2 + 1] = 0x00008E00 | (((u32) codeptr) & 0xffff0000);
-#endif
-}
-
-void
-enable_interrupts()
-{
-    // set up 8259 PIC for hardware interrupts at 0x20/0x28
-
-    out8( 0x20, 0x11);  // expect ICW4
-    out8( 0x21, 0x20);  // IRQ0 is int 0x20
-    out8( 0x21, 0x04);  // slave is on IRQ2
-    out8( 0x21, 0x01);  // manual EOI
-    out8( 0x21, 0x0);   // unmask all ints
-
-    out8( 0xA0, 0x11);  // expect ICW4
-    out8( 0xA1, 0x28);  // IRQ8 is int 0x28
-    out8( 0xA1, 0x02);  // i am attached to IRQ2
-    out8( 0xA1, 0x01);  // manual EOI
-    out8( 0xA1, 0x0);   // unmask all ints
-
-    // call timer isr at 100hz
     timer_phase(TIMER_HZ);
 
-#define EXCEPTION(N, FUNC) \
-    extern void *asm_exc##N; \
-    set_exception(N, &asm_exc##N); \
-    exc_handlers[N] = FUNC;
-
-    EXCEPTION(0, unhandled);
-    EXCEPTION(1, unhandled);
-    EXCEPTION(2, unhandled);
-    EXCEPTION(3, unhandled);
-    EXCEPTION(4, unhandled);
-    EXCEPTION(5, unhandled);
-    EXCEPTION(6, unhandled);
-    EXCEPTION(7, unhandled);
-    EXCEPTION(8, unhandled);
-    EXCEPTION(9, unhandled);
-    EXCEPTION(10, unhandled);
-    EXCEPTION(11, unhandled);
-    EXCEPTION(12, unhandled);
-    EXCEPTION(13, unhandled);
-    EXCEPTION(14, page_fault);
-
-#define IRQ(N, FUNC) \
-    extern void *asm_irq##N; \
-    set_exception(0x20 + N, &asm_irq##N); \
-    irq_handlers[N] = FUNC;
-
-    IRQ(0, isr_timer);
-    IRQ(1, isr_keyboard);
-    IRQ(2, unhandled);
-    IRQ(3, unhandled);
-    IRQ(4, unhandled);
-    IRQ(5, unhandled);
-    IRQ(6, unhandled);
-    IRQ(7, unhandled);
-    IRQ(8, unhandled);
-    IRQ(9, unhandled);
-    IRQ(10, unhandled);
-    IRQ(11, unhandled);
-    IRQ(12, unhandled);
-    IRQ(13, unhandled);
-    IRQ(14, unhandled);
-    IRQ(15, unhandled);
-
-    *(u32 *) 0x7df8 = (u32) exception_handler;
-
-    // enable interrupts on processor
-    asm volatile ("sti");
+    setup_interrupts(IDT_BASE);
 }
 
 void setch(int x, int y, char ch, char attr)

@@ -22,7 +22,7 @@ extern int read_key(int timeout, int show_cursor, int readline); // keyboard
 extern void yield();    // hlt, block until interrupt
 extern void halt();     // hlt forever
 
-extern void enable_interrupts();
+extern void init_kernel();
 
 // read time-stamp counter
 extern unsigned long long rdtsc(void);
