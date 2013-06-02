@@ -1,5 +1,6 @@
 
-#include "frotzos.h"
+#include <string.h> // memset
+#include "kernel.h"
 
 extern void main(int argc, char **argv);
 extern char START_BSS[], END_BSS[];
@@ -15,10 +16,6 @@ void kmain()
 
     init_kernel();
 
-    DEBUG("starting frotzos"); 
-
     main(1, argv);
-
-    halt();
 }
 

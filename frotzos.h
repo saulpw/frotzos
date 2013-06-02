@@ -2,9 +2,8 @@
 #define FROTZOS_H_
 
 #include <string.h>
+#include "kernel.h"
 #include "frotz.h"
-
-extern volatile double seconds; // second since start
 
 extern int cursor_x, cursor_y, current_color;
 
@@ -22,11 +21,6 @@ extern int read_key(int timeout, int show_cursor, int readline); // keyboard
 extern void yield();    // hlt, block until interrupt
 extern void halt();     // hlt forever
 
-extern void init_kernel();
-
-// read time-stamp counter
-extern unsigned long long rdtsc(void);
-
 // debug functions
 #define NOTIMPL TRACE("NOT IMPLEMENTED")
 
@@ -36,7 +30,6 @@ extern unsigned long long rdtsc(void);
 #define DEBUG(args...)
 #endif
 
-extern void os_display_num(int x, int y, int n, int base);
 extern void kprintf(const char *fmt, ...);
 
 #endif

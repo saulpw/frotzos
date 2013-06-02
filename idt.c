@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <string.h>
 #include "io.h"
+#include "kernel.h"
 
 /*
  * IDT at 0x1000
@@ -10,7 +11,6 @@
  * stage 0 handlers at 0x1200 + MAX_S0_LEN*intnum
  */
 
-#define NUM_INTS 64
 #define MAX_S0_LEN 32
 
 extern u32 irq_stage0_start, irq_stage0_fixup, irq_stage0_end;
@@ -47,10 +47,10 @@ lidt(void *base, unsigned int limit)
 void
 create_idt(u32 *idt) // and also stage0 interrupt stubs after the IDT
 {
-    u8 *handler_addr = (u8 *) (idt + 2*NUM_INTS);
+    u8 *handler_addr = (u8 *) (idt + 2*NUM_INTERRUPTS);
 
     int i;
-    for (i=0; i < NUM_INTS; ++i)
+    for (i=0; i < NUM_INTERRUPTS; ++i)
     {
         set_idt_entry(&idt[i*2], handler_addr);
 
@@ -113,7 +113,7 @@ setup_interrupts(void *idtaddr)
     create_idt(idtaddr);
 
     // load IDTR
-    lidt(idtaddr, 8*NUM_INTS-1);
+    lidt(idtaddr, 8*NUM_INTERRUPTS-1);
 
     // enable interrupts on processor
     asm volatile ("sti");

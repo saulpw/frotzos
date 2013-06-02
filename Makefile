@@ -32,6 +32,7 @@ FZ_OBJS := \
 		fzos_readline.o   \
 		fzos_string.o     \
 		ata.o             \
+		kdev_timer.o      \
 		kprintf.o         \
 		ksyscall.o        \
 		serial.o          \

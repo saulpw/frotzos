@@ -204,7 +204,11 @@ nextpage:
     mov eax, 0x8010      ; after 16-byte FILE header
     add al, [0x800f]     ; + filename size
 
-    jmp eax              ; kernel starts immediately
+    call eax              ; kernel starts immediately
+
+_halt:
+    hlt
+    jmp _halt
 
     times (512 - $ + entry - 2) db 0 ; pad boot sector with zeroes
 

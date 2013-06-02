@@ -2,15 +2,9 @@
 #include "frotzos.h"
 #include "io.h"
 #include "vgatext.h"
+#include "kernel.h"
 
-#define TIMER_HZ 100
-#define IDT_BASE ((void *) 0x1000)
-
-volatile double seconds = 0.0; // seconds since boot
-
-void setup_interrupts(void *idtaddr);
-void isr_keyboard();
-void isr_timer();
+extern void isr_keyboard();
 extern void page_fault(u32 errcode);
 
 void unhandled_irq(u32 irq)
@@ -56,15 +50,6 @@ void *irq_handlers[16] = {
     unhandled_irq, unhandled_irq, unhandled_irq, unhandled_irq,
 };
 
-static
-void timer_phase(int hz)
-{
-    int divisor = 1193180 / hz;
-    out8(0x43, 0x36);             // Counter0, LSB then MSB, square wave
-    out8(0x40, divisor & 0xFF);   // send LSB
-    out8(0x40, divisor >> 8);     // send MSB
-}
-
 static inline void a20wait()
 {
     while (in8(0x64) & 0x2)
@@ -98,7 +83,8 @@ enable_A20()
 void
 init_kernel()
 {
-    timer_phase(TIMER_HZ);
+    DEBUG("starting frotzos\r\n");
+    setup_timer();
 
     setup_interrupts(IDT_BASE);
 }
@@ -107,14 +93,6 @@ void setch(int x, int y, char ch, char attr)
 {
     vga_charptr(x, y)[0] = ch;
     vga_charptr(x, y)[1] = attr;
-}
-
-void isr_timer()
-{
-    seconds += (1.0 / TIMER_HZ);
-
-    static const char spinny[] = "\\|/-";
-    vga_charptr(80, 1)[0] = spinny[(int) (seconds) % (sizeof(spinny)-1)];
 }
 
 extern void key_released(int sc);
@@ -155,12 +133,5 @@ void yield()
 void halt()
 {
     asm volatile ("1: hlt; jmp 1b");
-}
-
-unsigned long long rdtsc(void)
-{
-    unsigned long long int x;
-    asm volatile (".byte 0x0f, 0x31" : "=A" (x));
-    return x;
 }
 
