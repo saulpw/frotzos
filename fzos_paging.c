@@ -1,8 +1,8 @@
 
-#include "frotzos.h"
-#include "string.h"
+#include <string.h>
 #include "io.h"
-#include "ata.h"
+#include "kernel.h"
+#include "kdev_ata.h"
 
 u32 * const PAGE_TABLES = (u32 *) 0xffc00000;
 u32 * const PAGE_DIR = (u32 *) 0xfffff000;
@@ -31,8 +31,9 @@ page_fault(int errcode)
 {
     u32 faultaddr = get_cr2();
 
-    if (faultaddr < 0x100000) {
-        os_fatal("lower 1MB page fault");
+    if (faultaddr < 0x1000) {
+        kprintf("NULL page fault at 0x%x\r\n", faultaddr);
+        halt();
     }
 
     // check for valid entry in PAGE_DIR
@@ -66,7 +67,8 @@ page_fault(int errcode)
                                      , 0    // multiCnt
                                      );
         if (rc != 0) {
-            os_fatal("unable to read page from disk");
+            kprintf("unable to read page from disk");
+            halt();
         }
          
     } else {

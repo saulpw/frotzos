@@ -33,7 +33,7 @@
 
 #include <io.h>
 #include <frotzos.h>
-#include "ata.h"
+#include "kdev_ata.h"
 
 //**************************************************************
 //

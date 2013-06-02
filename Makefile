@@ -20,8 +20,6 @@ MALLOC_CFLAGS= -O3 -DLACKS_UNISTD_H -DLACKS_FCNTL_H -DLACKS_SYS_PARAM_H  \
 -DMALLOC_FAILURE_ACTION='abort()' -DENOMEM=12 -DEINVAL=22
 
 FZ_OBJS := \
-		exceptions.o      \
-		idt.o      \
 		fzos_display.o    \
 		fzos_file.o       \
 		fzos_hw.o         \
@@ -31,7 +29,10 @@ FZ_OBJS := \
 		fzos_paging.o     \
 		fzos_readline.o   \
 		fzos_string.o     \
-		ata.o             \
+		int_stage0.o      \
+		interrupts.o      \
+		kdev_ata.o        \
+		kdev_kb.o         \
 		kdev_timer.o      \
 		kprintf.o         \
 		ksyscall.o        \
@@ -70,7 +71,7 @@ malloc.o: malloc.c
 bootloader.bin: bootloader.asm
 	nasm $(ASMFLAGS) -f bin -l $@.list -o $@ $<
 
-.s.o:
+%.o: %.asm
 	nasm $(ASMFLAGS) -f elf -o $@ $<
 
 %.simplefs:	%.z5 mkfzimg frotz.bin

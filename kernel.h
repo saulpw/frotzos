@@ -2,6 +2,14 @@
 #define KERNEL_H_
 
 extern void init_kernel();
+extern void kprintf(const char *fmt, ...);
+
+extern void yield();    // hlt, block until interrupt
+extern void halt();     // hlt forever
+
+#ifndef DEBUG
+#define DEBUG(args...)
+#endif
 
 // interrupts
 #define NUM_INTERRUPTS 64
@@ -23,5 +31,10 @@ static inline unsigned long long rdtsc(void) // read time-stamp counter
     asm volatile (".byte 0x0f, 0x31" : "=A" (x));
     return x;
 }
+
+// keyboard
+
+extern int pop_scancode();
+extern void isr_keyboard();
 
 #endif

@@ -13,23 +13,10 @@ extern const char *errmsg;
 extern struct fz_filehdr * const * enumfiles();
 
 extern void setch(int x, int y, char ch, char attr);
-extern void set_hw_cursor(int x, int y);
-
-extern int pop_scancode(); // keyboard
-extern int read_key(int timeout, int show_cursor, int readline); // keyboard
-
-extern void yield();    // hlt, block until interrupt
-extern void halt();     // hlt forever
-
+extern int read_key(int timeout, int show_cursor, int readline);
 // debug functions
 #define NOTIMPL TRACE("NOT IMPLEMENTED")
 
 #define TRACE(FMT, args...) DEBUG("%s [%s:%d] " FMT "\r\n", __FUNCTION__, __FILE__, __LINE__, ##args)
-
-#ifndef DEBUG
-#define DEBUG(args...)
-#endif
-
-extern void kprintf(const char *fmt, ...);
 
 #endif

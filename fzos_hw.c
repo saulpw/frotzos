@@ -1,10 +1,8 @@
 
-#include "frotzos.h"
 #include "io.h"
 #include "vgatext.h"
 #include "kernel.h"
 
-extern void isr_keyboard();
 extern void page_fault(u32 errcode);
 
 void unhandled_irq(u32 irq)
@@ -93,36 +91,6 @@ void setch(int x, int y, char ch, char attr)
 {
     vga_charptr(x, y)[0] = ch;
     vga_charptr(x, y)[1] = attr;
-}
-
-extern void key_released(int sc);
-extern void key_pressed(int sc);
-
-static unsigned char keyqueue[128];       // classic ring queue
-static unsigned int kqfront=0, kqback=0; // (kqend - kqstart) % 16 == size
-
-int pop_scancode()
-{
-    if (kqback == kqfront) { // queue is empty
-        return -1;
-    }
-
-    unsigned char k = keyqueue[kqfront++];
-    kqfront %= sizeof(keyqueue);
-    return k;
-}
-
-void
-isr_keyboard()
-{
-    int scancode = in8(0x60);
-
-    if ((kqback + 1) % sizeof(keyqueue) != kqfront)
-    {
-        keyqueue[kqback++] = scancode;
-        kqback %= sizeof(keyqueue);
-    } 
-    // else os_fatal("kb queue is full");
 }
 
 void yield()
