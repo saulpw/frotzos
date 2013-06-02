@@ -11,6 +11,49 @@
  * stage 0 handlers at 0x1200 + MAX_S0_LEN*intnum
  */
 
+void unhandled_irq(u32 irq)
+{
+    kprintf("Unhandled IRQ%d\r\n", irq);
+}
+
+void unhandled(u32 excnum, u32 errcode,
+               u32 edi, u32 esi, u32 ebp, u32 esp,
+               u32 ebx, u32 edx, u32 ecx, u32 new_eax,
+               u32 eax, u32 eip, u32 cs, u32 eflags)
+{
+#ifdef DEBUG
+    static const char *exc_names[] = {
+        "divide-by-zero", "debug", "NMI", "breakpoint",
+        "overflow", "bounds", "invalid opcode", "device n/a",
+        "double fault", "coproc", "invalid tss", "segment not present",
+        "stack-segment", "GPF", "page fault", "reserved",
+        "x87 fpe", "alignment", "machine check", "simd fpe",
+    };
+
+    kprintf("Unhandled exception %d (%s): eip=0x%x\r\n", excnum, exc_names[excnum], eip);
+#endif
+
+    halt();
+}
+
+void *exc_handlers[32] = { 
+    unhandled, unhandled, unhandled, unhandled,
+    unhandled, unhandled, unhandled, unhandled,
+    unhandled, unhandled, unhandled, unhandled,
+    unhandled, unhandled, page_fault, unhandled,
+    unhandled, unhandled, unhandled, unhandled,
+    unhandled, unhandled, unhandled, unhandled,
+    unhandled, unhandled, unhandled, unhandled,
+    unhandled, unhandled, unhandled, unhandled,
+};
+
+void *irq_handlers[16] = {
+    isr_timer, isr_keyboard, unhandled_irq, unhandled_irq,
+    unhandled_irq, unhandled_irq, unhandled_irq, unhandled_irq,
+    unhandled_irq, unhandled_irq, unhandled_irq, unhandled_irq,
+    unhandled_irq, unhandled_irq, unhandled_irq, unhandled_irq,
+};
+
 #define MAX_S0_LEN 32
 
 extern u32 irq_stage0_start, irq_stage0_fixup, irq_stage0_end;

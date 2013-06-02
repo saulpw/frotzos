@@ -26,7 +26,6 @@ FZ_OBJS := \
 		fzos_init.o       \
 		fzos_input.o      \
 		fzos_mem.o        \
-		fzos_paging.o     \
 		fzos_readline.o   \
 		fzos_string.o     \
 		int_stage0.o      \
@@ -36,6 +35,7 @@ FZ_OBJS := \
 		kdev_timer.o      \
 		kprintf.o         \
 		ksyscall.o        \
+		kvirtmem.o        \
 		serial.o          \
 		vgatext.o         \
 		malloc.o

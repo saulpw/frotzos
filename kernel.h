@@ -1,6 +1,8 @@
 #ifndef KERNEL_H_
 #define KERNEL_H_
 
+#include <sys/types.h>
+
 extern void init_kernel();
 extern void kprintf(const char *fmt, ...);
 
@@ -11,11 +13,20 @@ extern void halt();     // hlt forever
 #define DEBUG(args...)
 #endif
 
+// virtual memory
+#define PAGE_TABLES ((u32 *) 0xffc00000)
+#define PAGE_DIR ((u32 *) 0xfffff000)
+
+extern void page_fault(u32 errcode);
+
 // interrupts
 #define NUM_INTERRUPTS 64
 #define IDT_BASE ((void *) 0x1000)
 
-void setup_interrupts(void *idtaddr);
+extern void setup_interrupts(void *idtaddr);
+
+extern void *exc_handlers[];
+extern void *irq_handlers[];
 
 // timer
 #define TIMER_HZ 100

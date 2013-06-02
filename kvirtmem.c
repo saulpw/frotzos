@@ -4,9 +4,6 @@
 #include "kernel.h"
 #include "kdev_ata.h"
 
-u32 * const PAGE_TABLES = (u32 *) 0xffc00000;
-u32 * const PAGE_DIR = (u32 *) 0xfffff000;
-
 static inline u32
 get_cr2()
 {
@@ -16,7 +13,7 @@ get_cr2()
     return val;
 }
 
-// high-water mark for allocated out pages
+// high-water mark for allocated physical pages
 static u32 nextpage = 0x100000;        // 1MB
 
 u32 get_phys_page()
@@ -27,7 +24,7 @@ u32 get_phys_page()
 }
 
 void
-page_fault(int errcode)
+page_fault(u32 errcode)
 {
     u32 faultaddr = get_cr2();
 
