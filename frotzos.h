@@ -36,7 +36,13 @@ extern unsigned long long rdtsc(void);
 // debug functions
 #define NOTIMPL TRACE(NOTIMPL)
 #define TRACE(X) trace(__FUNCTION__, __FILE__, __LINE__, #X)
+
+#ifndef DEBUG
+#define DEBUG(args...)
+#endif
+
 extern void trace(const char *func, const char *fn, int line, const char *note);
 extern void os_display_num(int x, int y, int n, int base);
+extern void kprintf(const char *fmt, ...);
 
 #endif

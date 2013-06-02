@@ -1,7 +1,5 @@
 ; compile with nasm, use as disk image to qemu-system-i386
 
-%define DEBUG 0
-
 [BITS 16]
 [ORG 0x7c00]
 
@@ -123,7 +121,7 @@ LBAtoCHS:
     jmp leap
 
 success:
-%if DEBUG
+%ifdef DEBUG
     mov al, '.'
     call putc
 %endif
@@ -136,7 +134,7 @@ success:
     inc word [current_lba]
     loop nextsector
 
-%if DEBUG
+%ifdef DEBUG
     mov al, '>'
     call putc
 %endif
@@ -259,7 +257,7 @@ stage1isr:
 
     pushad
 
-%if DEBUG
+%ifdef DEBUG
     ; DEBUG: display interrupt#
     push eax
     mov edi, 0xb8000 + 160 + 156
@@ -281,7 +279,7 @@ stage1isr:
     iret
 
 exception_halt: ; instead of iret, but restore state for easier debugging
-%if DEBUG
+%ifdef DEBUG
     pop eax     ; remove ret address from call [isr2]
     pop eax     ; remove exception number parameter
     popad
@@ -293,7 +291,7 @@ _halt:
     jmp _halt
 
 
-%if DEBUG
+%ifdef DEBUG
 hex8:
     mov bl, al
     shr al, 4

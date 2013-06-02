@@ -9,6 +9,11 @@ INCLUDES= -I$(FROTZDIR)/src/common -I.
 WARNFLAGS=-Wall -Wextra -Werror -Wno-pointer-sign -Wno-unused
 CFLAGS += -ggdb -O2 $(ARCHFLAGS) $(INCLUDES) $(WARNFLAGS)
 
+ifdef DEBUG
+	CFLAGS += -DDEBUG=kprintf
+	ASMFLAGS += -DDEBUG=1
+endif
+
 MALLOC_CFLAGS= -O3 -DLACKS_UNISTD_H -DLACKS_FCNTL_H -DLACKS_SYS_PARAM_H  \
 -DLACKS_SYS_MMAN_H -DLACKS_STRINGS_H -DLACKS_ERRNO_H -DLACKS_SYS_TYPES_H \
 -DLACKS_SCHED_H -DLACKS_TIME_H -Dmalloc_getpagesize=4096 -DHAVE_MMAP=0   \
@@ -26,10 +31,18 @@ FZ_OBJS := \
 		fzos_string.o     \
 		ata.o             \
 		debug.o           \
+		kprintf.o         \
+		serial.o          \
 		malloc.o
 
 # if you have LostPig.z8, 'make LostPig.img'
-all: frotz.bin frotz.elf
+
+ZCODE_FILES = $(wildcard zcode/*.z*)
+
+IMAGE_FILES += $(patsubst %.z5,%.img,$(ZCODE_FILES))
+IMAGE_FILES += $(patsubst %.z8,%.img,$(ZCODE_FILES))
+
+all: frotz.bin frotz.elf $(IMAGE_FILES)
 
 $(FROTZLIB):
 	CFLAGS="-nostdinc -I.. -ggdb -march=i386 -m32" make -C $(FROTZDIR) src/$(FROTZLIB)
@@ -51,9 +64,12 @@ malloc.o: malloc.c
 	gcc -c $(CFLAGS) $(MALLOC_CFLAGS) -o $@ $<
 
 bootloader.bin: bootloader.asm
-	nasm -f bin -l $@.list -o $@ $<
+	nasm $(ASMFLAGS) -f bin -l $@.list -o $@ $<
 
-%.simplefs:	%.z* mkfzimg frotz.bin
+%.simplefs:	%.z5 mkfzimg frotz.bin
+	./mkfzimg -o $@ frotz.bin $<
+
+%.simplefs:	%.z8 mkfzimg frotz.bin
 	./mkfzimg -o $@ frotz.bin $<
 
 %.img: %.simplefs bootloader.bin frotz.elf

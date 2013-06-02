@@ -108,9 +108,7 @@ read_key (int timeout, int show_cursor, int readline)
                     return ch | shifts;
                 }
             }
-#ifdef DEBUG
-            os_display_num(scancode, 16);
-#endif
+            DEBUG("unknown scancode 0x%x\r\n", scancode);
         }
     } while (timeout == 0 || seconds < endseconds);
 

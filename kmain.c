@@ -13,6 +13,8 @@ void kmain()
 
     memset(START_BSS, 0, END_BSS - START_BSS);
 
+    DEBUG("starting frotzos"); 
+
     main(1, argv);
 
     halt();
