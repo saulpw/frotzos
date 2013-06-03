@@ -1,7 +1,6 @@
 ENTRY (kmain)
 STARTUP(kmain.o)
 
-_TEXTMODE_BUFFER = 0xb8000;
 . = 0x00008020;
 
 SECTIONS
@@ -28,10 +27,4 @@ SECTIONS
         *(.bss)
         END_BSS = .;
     }
-
-    .heap ALIGN (0x1000):
-    {
-        HEAP = .;
-    }
-
 }

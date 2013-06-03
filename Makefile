@@ -20,6 +20,7 @@ MALLOC_CFLAGS= -O3 -DLACKS_UNISTD_H -DLACKS_FCNTL_H -DLACKS_SYS_PARAM_H  \
 -DMALLOC_FAILURE_ACTION='abort()' -DENOMEM=12 -DEINVAL=22
 
 FZ_OBJS := \
+		elifs.o           \
 		fzos_display.o    \
 		fzos_file.o       \
 		fzos_hw.o         \
@@ -36,6 +37,7 @@ FZ_OBJS := \
 		kprintf.o         \
 		ksyscall.o        \
 		kvirtmem.o        \
+		lib_stdio.o       \
 		serial.o          \
 		vgatext.o         \
 		malloc.o

@@ -1,14 +1,14 @@
 #include "frotzos.h"
 
-extern char HEAP[]; // after the bss
-static void *nextalloc = HEAP;
+static void *nextalloc = (void *) HEAP_ADDR;
 
 void *sbrk(int incr)
 {
     void *ret = nextalloc;
     nextalloc += incr;
-    if (nextalloc > (void *) 0xF00000) {
-        os_fatal("sbrk'ed more than 14MB");
+    if (nextalloc > (void *) HEAP_ADDR_MAX) {
+        kprintf("sbrk(%u) would go over 0x%x", incr, HEAP_ADDR_MAX);
+        halt();
     }
     return ret;
 }

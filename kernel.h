@@ -16,6 +16,10 @@ extern void halt();     // hlt forever
 // virtual memory
 #define PAGE_TABLES ((u32 *) 0xffc00000)
 #define PAGE_DIR ((u32 *) 0xfffff000)
+#define DISK_MAP_ADDR 0x10000000
+#define DISK_MAP_ADDR_MAX 0xf0000000
+#define HEAP_ADDR 0x100000
+#define HEAP_ADDR_MAX 0xf00000
 
 extern void page_fault(u32 errcode);
 

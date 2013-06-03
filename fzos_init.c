@@ -1,5 +1,5 @@
 #include "frotzos.h"
-#include "filehdr.h"
+#include "elifs.h"
 
 f_setup_t f_setup;
 extern char *story_name;
@@ -27,7 +27,7 @@ void os_init_setup()
 
 void os_process_arguments (int argc, char *argv[])
 {
-    struct fz_filehdr * const * files = enumfiles();
+    struct fz_filehdr * const * files = elifs_enumfiles();
     story_name = files[1]->name;
 //    graphics_filename = "gfx";
 }

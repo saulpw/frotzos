@@ -9,9 +9,6 @@ extern int cursor_x, cursor_y, current_color;
 
 extern const char *errmsg;
 
-// get the array of filenames
-extern struct fz_filehdr * const * enumfiles();
-
 extern void setch(int x, int y, char ch, char attr);
 extern int read_key(int timeout, int show_cursor, int readline);
 // debug functions

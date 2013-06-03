@@ -42,12 +42,12 @@ page_fault(u32 errcode)
     // fill in page table entry with free page
     PAGE_TABLES[faultaddr >> 12] = get_phys_page() | 0x3; // RW + PRESENT
 
-    if (faultaddr >= 0x10000000 && faultaddr < 0xf0000000)
+    if (faultaddr >= DISK_MAP_ADDR && faultaddr < DISK_MAP_ADDR_MAX)
     {
         // 256MB-3.8GB is mmap'ed disk
         // if page backed by disk, load from disk
         
-        int diskoffset = faultaddr - 0x10000000;
+        int diskoffset = faultaddr - DISK_MAP_ADDR;
         int pagenum = diskoffset >> 12;
         int sectornum = pagenum * 8;
         int lba = sectornum + 1;

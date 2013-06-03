@@ -8,13 +8,15 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "filehdr.h"
+#include "elifs.h"
 
 int
 main(int argc, char * const argv[])
 {
     int opt;
     const char *outfn = "floppy.img";
+
+    assert(sizeof(struct fz_filehdr) == 16);
 
     while ((opt = getopt(argc, argv, "o:")) != -1)
     {
@@ -55,7 +57,9 @@ main(int argc, char * const argv[])
 
         int namelen = strlen(infn)+1;
         if (namelen & 0xf) namelen = (namelen + 16) & ~0x0f; // pad fn
-        assert(namelen <= 112);
+        if (namelen > 128) namelen = (namelen / 16) + 120;
+        assert(namelen < 256);
+
         int hdrlen = sizeof(struct fz_filehdr) + namelen;
         char hdrbuf[hdrlen];
         memset(hdrbuf, 0, hdrlen);
