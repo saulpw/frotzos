@@ -1,5 +1,5 @@
 #include "frotzos.h"
-#include "vgatext.h"
+#include "dev/vgatext.h"
 
 int cursor_x=1, cursor_y=24;
 int current_color = 0x17;

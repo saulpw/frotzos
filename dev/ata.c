@@ -33,8 +33,8 @@
 
 #include <io.h>
 #include "kernel.h"
-#include "dev_time.h"
-#include "dev_ata.h"
+#include "dev/time.h"
+#include "dev/ata.h"
 
 //**************************************************************
 //

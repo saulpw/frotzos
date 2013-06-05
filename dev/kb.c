@@ -1,6 +1,6 @@
 #include "io.h"
 #include "kernel.h"
-#include "dev_kb.h"
+#include "dev/kb.h"
 
 static const unsigned char kbdus[128] = {
   0,ESC,'1','2','3','4','5','6','7','8','9','0','-','=',BKSP,          // 00-0E

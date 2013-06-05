@@ -2,8 +2,8 @@
 #include <string.h>
 #include "io.h"
 #include "kernel.h"
-#include "dev_kb.h"
-#include "dev_time.h"
+#include "dev/kb.h"
+#include "dev/time.h"
 
 /*
  * IDT at 0x1000

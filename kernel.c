@@ -1,5 +1,5 @@
 #include "kernel.h"
-#include "dev_time.h"
+#include "dev/time.h"
 
 void
 init_kernel()

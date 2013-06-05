@@ -27,11 +27,11 @@ FROTZ_OBJS := $(addprefix frotz/src/frotzos/, \
 )
 
 FZ_OBJS := \
-		dev_ata.o         \
-		dev_kb.o          \
-		dev_serial.o      \
-		dev_time.o        \
-		vgatext.o         \
+		dev/ata.o         \
+		dev/kb.o          \
+		dev/serial.o      \
+		dev/time.o        \
+		dev/vgatext.o     \
 		int_stage0.o      \
 		interrupts.o      \
 		kernel.o          \

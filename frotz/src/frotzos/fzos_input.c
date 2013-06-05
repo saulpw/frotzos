@@ -1,7 +1,7 @@
 #include "frotzos.h"
-#include "vgatext.h"
-#include "dev_kb.h"
-#include "dev_time.h"
+#include "dev/kb.h"
+#include "dev/time.h"
+#include "dev/vgatext.h"
 
 inline zchar KeyToZchar(unsigned int k)
 {

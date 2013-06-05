@@ -1,7 +1,7 @@
 #include "kernel.h"
 #include "io.h"
 #include "vgatext.h"
-#include "dev_time.h"
+#include "dev/time.h"
 
 static volatile double g_seconds = 0.0; // seconds since boot
 
