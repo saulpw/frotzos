@@ -19,28 +19,29 @@ MALLOC_CFLAGS= -O3 -DLACKS_UNISTD_H -DLACKS_FCNTL_H -DLACKS_SYS_PARAM_H  \
 -DLACKS_SCHED_H -DLACKS_TIME_H -Dmalloc_getpagesize=4096 -DHAVE_MMAP=0   \
 -DMALLOC_FAILURE_ACTION='abort()' -DENOMEM=12 -DEINVAL=22
 
-FZ_OBJS := \
-		elifs.o           \
-		fzos_display.o    \
-		fzos_file.o       \
-		fzos_hw.o         \
+FROTZ_OBJS := $(addprefix frotz/src/frotzos/, \
 		fzos_init.o       \
 		fzos_input.o      \
-		fzos_mem.o        \
-		fzos_readline.o   \
-		fzos_string.o     \
+		fzos_display.o    \
+		fzos_file.o       \
+)
+
+FZ_OBJS := \
+		dev_ata.o         \
+		dev_kb.o          \
+		dev_serial.o      \
+		dev_time.o        \
+		vgatext.o         \
 		int_stage0.o      \
 		interrupts.o      \
-		kdev_ata.o        \
-		kdev_kb.o         \
-		kdev_timer.o      \
+		kernel.o          \
 		kprintf.o         \
-		ksyscall.o        \
 		kvirtmem.o        \
+		elifs.o           \
 		lib_stdio.o       \
-		serial.o          \
-		vgatext.o         \
-		malloc.o
+		malloc.o          \
+		string.o          \
+		$(FROTZ_OBJS)     \
 
 # if you have LostPig.z8, 'make LostPig.img'
 

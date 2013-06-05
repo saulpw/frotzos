@@ -32,8 +32,9 @@
 //********************************************************************
 
 #include <io.h>
-#include <frotzos.h>
-#include "kdev_ata.h"
+#include "kernel.h"
+#include "dev_time.h"
+#include "dev_ata.h"
 
 //**************************************************************
 //
@@ -2809,7 +2810,7 @@ static int tmr_chk_timeout( void )
 
 long SYSTEM_READ_TIMER()
 {
-    return seconds * 100;
+    return seconds() * 100;
 }
 
 volatile int ata_interrupt_received = 0;
@@ -2818,12 +2819,12 @@ int
 SYSTEM_WAIT_INTR_OR_TIMEOUT()
 {
     ata_interrupt_received = 0;
-    float start = seconds;
+    double start = seconds();
 
 // Command time out in seconds
 #define TMR_TIME_OUT 20
 
-    while (seconds - start < TMR_TIME_OUT)
+    while (seconds() - start < TMR_TIME_OUT)
     {
         if (ata_interrupt_received) {
             return 0;

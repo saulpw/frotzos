@@ -2,12 +2,10 @@
 #define KERNEL_H_
 
 #include <sys/types.h>
+#include "x86.h"
 
-extern void init_kernel();
-extern void kprintf(const char *fmt, ...);
-
-extern void yield();    // hlt, block until interrupt
-extern void halt();     // hlt forever
+void init_kernel();
+void kprintf(const char *fmt, ...);
 
 #ifndef DEBUG
 #define DEBUG(args...)
@@ -21,35 +19,15 @@ extern void halt();     // hlt forever
 #define HEAP_ADDR 0x100000
 #define HEAP_ADDR_MAX 0xf00000
 
-extern void page_fault(u32 errcode);
+void page_fault(u32 errcode);
 
 // interrupts
 #define NUM_INTERRUPTS 64
 #define IDT_BASE ((void *) 0x1000)
 
-extern void setup_interrupts(void *idtaddr);
+void setup_interrupts(void *idtaddr);
 
 extern void *exc_handlers[];
 extern void *irq_handlers[];
-
-// timer
-#define TIMER_HZ 100
-
-extern volatile double seconds;        // seconds since start
-
-extern void setup_timer();
-extern void isr_timer();
-
-static inline unsigned long long rdtsc(void) // read time-stamp counter
-{
-    unsigned long long int x;
-    asm volatile (".byte 0x0f, 0x31" : "=A" (x));
-    return x;
-}
-
-// keyboard
-
-extern int pop_scancode();
-extern void isr_keyboard();
 
 #endif

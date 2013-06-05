@@ -2,17 +2,17 @@
 #define FROTZOS_H_
 
 #include <string.h>
-#include "kernel.h"
+#include "x86.h"
 #include "frotz.h"
 
 extern int cursor_x, cursor_y, current_color;
+void setch(int x, int y, char ch, char attr);
 
-extern const char *errmsg;
-
-extern void setch(int x, int y, char ch, char attr);
-extern int read_key(int timeout, int show_cursor, int readline);
 // debug functions
-#define NOTIMPL TRACE("NOT IMPLEMENTED")
+#define NOTIMPL do { \
+    os_display_string(__FUNCTION__); \
+    os_display_string(": NOT IMPLEMENTED\n"); \
+} while (0)
 
 #define TRACE(FMT, args...) DEBUG("%s [%s:%d] " FMT "\r\n", __FUNCTION__, __FILE__, __LINE__, ##args)
 

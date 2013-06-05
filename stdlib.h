@@ -1,8 +1,9 @@
 #ifndef FZ_STDLIB_H_
 #define FZ_STDLIB_H_
 
+#include <stdint.h>
+
 typedef signed int ptrdiff_t;
-typedef unsigned int size_t;
 typedef signed int time_t;
 
 #define NULL ((void *) 0)

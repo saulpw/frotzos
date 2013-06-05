@@ -256,7 +256,7 @@ int snprintf(char *buf, unsigned int sz, const char *fmt, ...)
 	return rv;
 }
 
-#include "serial.h"
+#include "dev_serial.h"
 
 void
 kprintf(const char *fmt, ...)

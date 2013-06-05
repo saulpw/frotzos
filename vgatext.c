@@ -12,3 +12,9 @@ void vga_set_cursor(int x, int y)
     out8(0x3D4, 0x0E);
     out8(0x3D5, (unsigned char)((pos >> 8) & 0xFF));
 }
+
+unsigned char vga_color(color_t fg, color_t bg)
+{
+    return (bg << 4) | fg;
+}
+

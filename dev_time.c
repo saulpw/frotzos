@@ -1,8 +1,11 @@
 #include "kernel.h"
 #include "io.h"
 #include "vgatext.h"
+#include "dev_time.h"
 
-volatile double seconds = 0.0; // seconds since boot
+static volatile double g_seconds = 0.0; // seconds since boot
+
+double seconds() { return g_seconds; }
 
 void setup_timer()
 {
@@ -14,9 +17,9 @@ void setup_timer()
 
 void isr_timer()
 {
-    seconds += (1.0 / TIMER_HZ);
+    g_seconds += (1.0 / TIMER_HZ);
 
     static const char spinny[] = "\\|/-";
-    vga_charptr(80, 1)[0] = spinny[(int) (seconds) % (sizeof(spinny)-1)];
+    vga_charptr(79, 0)[0] = spinny[(int) (g_seconds) % (sizeof(spinny)-1)];
 }
 

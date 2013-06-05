@@ -1,10 +1,8 @@
 #include "frotzos.h"
-#include "elifs.h"
+#include "x86.h"
 
 f_setup_t f_setup;
 extern char *story_name;
-
-const char *errmsg = NULL;
 
 void os_init_setup()
 {
@@ -16,7 +14,7 @@ void os_init_setup()
 	f_setup.left_margin = 0;
 	f_setup.right_margin = 0;
 	f_setup.ignore_errors = 1;
-	f_setup.piracy = 0;		/* enable the piracy opcode */
+	f_setup.piracy = 0;
 	f_setup.undo_slots = MAX_UNDO_SLOTS;
 	f_setup.expand_abbreviations = 0;
 	f_setup.script_cols = 80;
@@ -27,8 +25,7 @@ void os_init_setup()
 
 void os_process_arguments (int argc, char *argv[])
 {
-    struct fz_filehdr * const * files = elifs_enumfiles();
-    story_name = files[1]->name;
+    story_name = argv[1];
 //    graphics_filename = "gfx";
 }
 
@@ -75,4 +72,9 @@ void 	os_prepare_sample (int number) { NOTIMPL; }
 void 	os_start_sample (int number, int volume, int repeats, zword eos) { NOTIMPL; }
 void 	os_stop_sample () { NOTIMPL; }
 void 	os_finish_with_sample () { NOTIMPL; }
+
+void __stack_chk_fail(void)
+{ 
+    os_fatal("stack_chk_fail");
+}
 

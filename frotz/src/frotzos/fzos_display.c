@@ -11,11 +11,13 @@ int os_font_data (int font, int *height, int *width)
     if (font == TEXT_FONT) {
       *height = 1; *width = 1; return 1;
     }
+    // NOTIMPL
     return 0;
 }
 
 void os_set_font (int f)
 {
+    // NOTIMPL
     switch (f) {
     case TEXT_FONT:
     case PICTURE_FONT:
@@ -28,7 +30,6 @@ void os_set_font (int f)
 
 int os_char_width (zchar c)
 {
-    // XXX: what about ZC_INDENT and ZC_GAP?
     return 1;
 }
 
@@ -76,54 +77,51 @@ static
 unsigned int color_code(int c)
 {
     switch (c) {
-    case BLACK_COLOUR:   return 0;
-    case BLUE_COLOUR:    return 1;
-    case GREEN_COLOUR:   return 2;
-    case CYAN_COLOUR:    return 3;
-    case RED_COLOUR:     return 4;
-    case MAGENTA_COLOUR: return 5;
-    case YELLOW_COLOUR:  return 6 + 8;  // bright brown
-    case WHITE_COLOUR:   return 7 + 8;  // bright grey
-    case GREY_COLOUR:
-//    case LIGHTGREY_COLOUR:
+    case BLACK_COLOUR:   return VGA_BLACK;
+    case BLUE_COLOUR:    return VGA_BLUE;
+    case GREEN_COLOUR:   return VGA_GREEN;
+    case CYAN_COLOUR:    return VGA_CYAN;
+    case RED_COLOUR:     return VGA_RED;
+    case MAGENTA_COLOUR: return VGA_MAGENTA;
+    case YELLOW_COLOUR:  return VGA_YELLOW;
+    case WHITE_COLOUR:   return VGA_BRIGHT_WHITE;
     case MEDIUMGREY_COLOUR:
-    case DARKGREY_COLOUR:
-//    case DEFAULT_COLOUR:
+    case DARKGREY_COLOUR: return VGA_GREY;
+    case GREY_COLOUR:
     default:
-        return 7;
+        return VGA_WHITE;
     };
 }
 
 static
-void compute_current_color()
+unsigned char
+compute_color(color_t fg, color_t bg)
 {
-    int fg, bg;
-
     if (current_style & REVERSE_STYLE) {
-        bg = color_code(current_fg);
-        fg = color_code(current_bg);
-    } else {
-        fg = color_code(current_fg);
-        bg = color_code(current_bg);
+        color_t tmp = fg;
+        fg = bg;
+        bg = tmp;
     }
 
-    if (current_style & BOLDFACE_STYLE) fg |= 0x08;
-    if (current_style & EMPHASIS_STYLE) bg |= 0x08;
+    unsigned char c = vga_color(fg, bg);
 
-    current_color = (bg << 4) | fg;
+    if (current_style & BOLDFACE_STYLE) c = bold(c);
+    if (current_style & EMPHASIS_STYLE) c = blink(c);
+
+    return c;
 }
 
 void os_set_colour (int fg, int bg)
 {
-    current_fg = fg;
-    current_bg = bg;
-    compute_current_color();
+    current_fg = color_code(fg);
+    current_bg = color_code(bg);
+    current_color = compute_color(current_fg, current_bg);
 }
 
 void os_set_text_style (int s)
 {
     current_style = s;
-    compute_current_color();
+    current_color = compute_color(current_fg, current_bg);
 }
 
 void
@@ -131,6 +129,12 @@ os_set_cursor (int y, int x)
 { 
     cursor_x = x;
     cursor_y = y;
+}
+
+void setch(int x, int y, char ch, char attr)
+{
+    vga_charptr(x-1, y-1)[0] = ch;
+    vga_charptr(x-1, y-1)[1] = attr;
 }
 
 static
@@ -187,7 +191,7 @@ void os_scroll_area (int top, int left, int bot, int right, int units)
 {
     int y;
     for (y=top; y <= bot; ++y) {
-        memcpy((void *) vga_charptr(left, y), (void *) vga_charptr(left, y+units), (right-left)*2+2);
+        memcpy((void *) vga_charptr(left-1, y-1), (void *) vga_charptr(left-1, y+units-1), (right-left)*2+2);
         os_erase_area(y+units, left, y+units, right);
     }
 }

@@ -1,6 +1,0 @@
-
-void syscall_handler()
-{
-
-}
-

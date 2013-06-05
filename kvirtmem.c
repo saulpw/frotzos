@@ -2,7 +2,7 @@
 #include <string.h>
 #include "io.h"
 #include "kernel.h"
-#include "kdev_ata.h"
+#include "dev_ata.h"
 
 static inline u32
 get_cr2()
