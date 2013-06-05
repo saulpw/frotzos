@@ -13,48 +13,48 @@
  * stage 0 handlers at 0x1200 + MAX_S0_LEN*intnum
  */
 
-void unhandled_irq(u32 irq)
+void irq_handler(u32 irq)
 {
-    kprintf("Unhandled IRQ%d\r\n", irq);
+    switch (irq) {
+    case 0: isr_timer(); break;
+    case 1: isr_keyboard(); break;
+    default:
+            kprintf("Unhandled IRQ%d\r\n", irq);
+            break;
+    };
 }
 
-void unhandled(u32 excnum, u32 errcode,
+void exception_handler(u32 exc, u32 errcode,
                u32 edi, u32 esi, u32 ebp, u32 esp,
                u32 ebx, u32 edx, u32 ecx, u32 new_eax,
                u32 eax, u32 eip, u32 cs, u32 eflags)
 {
-#ifdef DEBUG
-    static const char *exc_names[] = {
-        "divide-by-zero", "debug", "NMI", "breakpoint",
-        "overflow", "bounds", "invalid opcode", "device n/a",
-        "double fault", "coproc", "invalid tss", "segment not present",
-        "stack-segment", "GPF", "page fault", "reserved",
-        "x87 fpe", "alignment", "machine check", "simd fpe",
+    switch (exc) {
+        case 14: page_fault(errcode); break;
+
+        case 0:  // divide-by-zero
+        case 1:  // debug
+        case 2:  // nmi
+        case 3:  // breakpoint
+        case 4:  // overflow
+        case 5:  // bounds
+        case 6:  // invalid opcode
+        case 7:  // device n/a
+        case 8:  // double fault
+        case 9:  // coproc
+        case 10: // invalid tss
+        case 11: // segment not present
+        case 12: // stack-segment
+        case 13: // GPF
+        case 16: // x87 fpe
+        case 17: // alignment
+        case 18: // machine check
+        case 19: // simd fpe
+        default:
+            kprintf("Unhandled exception %d: eip=0x%x\r\n", exc, eip);
+            halt();
     };
-
-    kprintf("Unhandled exception %d (%s): eip=0x%x\r\n", excnum, exc_names[excnum], eip);
-#endif
-
-    halt();
 }
-
-void *exc_handlers[32] = { 
-    unhandled, unhandled, unhandled, unhandled,
-    unhandled, unhandled, unhandled, unhandled,
-    unhandled, unhandled, unhandled, unhandled,
-    unhandled, unhandled, page_fault, unhandled,
-    unhandled, unhandled, unhandled, unhandled,
-    unhandled, unhandled, unhandled, unhandled,
-    unhandled, unhandled, unhandled, unhandled,
-    unhandled, unhandled, unhandled, unhandled,
-};
-
-void *irq_handlers[16] = {
-    isr_timer, isr_keyboard, unhandled_irq, unhandled_irq,
-    unhandled_irq, unhandled_irq, unhandled_irq, unhandled_irq,
-    unhandled_irq, unhandled_irq, unhandled_irq, unhandled_irq,
-    unhandled_irq, unhandled_irq, unhandled_irq, unhandled_irq,
-};
 
 #define MAX_S0_LEN 32
 

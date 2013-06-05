@@ -38,7 +38,7 @@ FZ_OBJS := \
 		kprintf.o         \
 		kvirtmem.o        \
 		elifs.o           \
-		lib_stdio.o       \
+		stdio.o           \
 		malloc.o          \
 		string.o          \
 		$(FROTZ_OBJS)     \

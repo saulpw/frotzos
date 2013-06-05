@@ -1,11 +1,15 @@
 [BITS 32]
 
-extern exc_handlers, irq_handlers, syscall_handler
-
 global irq_stage0_start, irq_stage0_fixup, irq_stage0_end
 global exc_stage0_start, exc_stage0_fixup, exc_stage0_end
 global excerr_stage0_start, excerr_stage0_fixup, excerr_stage0_end
 global syscall_stage0_start, syscall_stage0_fixup, syscall_stage0_end
+
+extern exception_handler, irq_handler, syscall_handler
+
+exc_handler_ptr dd exception_handler
+irq_handler_ptr dd irq_handler
+sys_handler_ptr dd syscall_handler
 
 excerr_stage0_start:
     xchg eax, [esp]            ; eax = error code
@@ -15,7 +19,7 @@ excerr_stage0_fixup:
     mov eax, 0
     push eax                   ; arg1 = exception #
     push exception_end         ; unified return address
-    jmp [exc_handlers + eax*4]  ; exception_handlers[excnum](exc#, errcode, ...)
+    jmp [exc_handler_ptr]      ; exception_handler(exc#, errcode, ...)
 excerr_stage0_end equ $
 
 exc_stage0_start:
@@ -26,7 +30,7 @@ exc_stage0_fixup:              ; "mov eax" is only 1 byte, literal follows
     mov eax, 0
     push eax                   ; arg1 = exception #
     push exception_end         ; unified return address
-    jmp [exc_handlers + eax*4]  ; exception_handlers[excnum](exc#, errcode, ...)
+    jmp [exc_handler_ptr]      ; exception_handler(exc#, errcode, ...)
 exc_stage0_end equ $
 
 global exception_end
@@ -41,15 +45,15 @@ irq_stage0_start:
     pushad                     ; save all registers
 irq_stage0_fixup:
     mov eax, 0
-    push eax                   ; arg1 = irq #
+    push eax                   ; arg1 = IRQ #
     push irq_end
-    jmp [irq_handlers + eax*4] ; irq_handlers[irq#](irq#, ...)
+    jmp [irq_handler_ptr]      ; irq_handler(irq#, ...)
 irq_stage0_end equ $
 
 global irq_end
 irq_end:
     pop eax
-    cmp al, 0x28
+    cmp al, 8                  ; ACK IRQ0-7 on master only
     jb master_irq_end
 
     mov al, 0x20
@@ -70,7 +74,7 @@ syscall_stage0_start:
 syscall_stage0_fixup:
     mov eax, 0
     push eax
-    call syscall_handler       ; returns value in eax
+    call [sys_handler_ptr]     ; returns value in eax
     add esp, 4                 ; drop u32* parms
     iret
 syscall_stage0_end equ $
