@@ -38,6 +38,10 @@ read_key (int timeout, int show_cursor, int readline)
 
     do {
         int key = get_key();
+        if (key == -1) {
+            yield();
+            continue;
+        }
         switch (key) {
         case HOME:  if (readline) return 1; break; // home == ^a
         case UP:    return ZC_ARROW_UP;    // up
