@@ -3,18 +3,19 @@
 
 #include <stdint.h>
 
+#define ELIFS_MAGIC 0x46696c65  // 'eliF' to indicate little-endianness
+
 typedef struct fz_filehdr {
-    uint32_t magic;
-    uint32_t length;       // exact file length if <4GB
-    uint32_t length_msw;   // unlikely to be used
-    uint16_t reserved;
-    uint8_t status;     // see below
-    uint8_t namelength; // in bytes if <= 128 bytes, 16*(NL-120) otherwise
+    uint32_t app_use;      // for the application's use
+    uint32_t magic;        // should be ELIFS_MAGIC
+    uint32_t length;       // exact file length in bytes (max 4GB files)
+    uint16_t reserved;     // should be zero
+    uint8_t status;        // see below
+    uint8_t namelength;    // in bytes
     char name[];
 } fz_filehdr_t;
 
-#define ELIFS_MAGIC 0x46494c45  // 'ELIF' to indicate little-endianness
-#define MAX_FILENAME_LEN 2160   // (255 - 120)*16 == 2160
+#define MAX_NAME_LEN 255
 
 #define STATUS_SENTINEL 0
 #define STATUS_EXISTING 1
@@ -31,22 +32,9 @@ struct fz_filehdr * const * elifs_enumfiles();
 
 #define DONT_EMIT extern inline __attribute__ ((gnu_inline))
 
-DONT_EMIT uint64_t elif_length(const struct fz_filehdr *h)
-{
-    uint64_t ret = h->length_msw;
-    ret <<= 32;
-    ret += h->length;
-    return ret;
-}
-
-DONT_EMIT int elif_fnlen(const struct fz_filehdr *h)
-{
-    return (h->namelength < 128) ? h->namelength : 16*(h->namelength - 120);
-}
-
 DONT_EMIT void *elif_data(const struct fz_filehdr *h)
 {
-    return ((void *) h) + 16 + elif_fnlen(h);
+    return ((void *) h) + 16 + h->namelength;
 }
 
 #endif

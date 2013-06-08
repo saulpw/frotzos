@@ -1,10 +1,169 @@
 ; compile with nasm, use as disk image to qemu-system-i386
 
+%define BANNER 'SP/OS (2013) Saul Pwanson'
+%strlen BANNER_LEN BANNER
+
+; (boot sector - elif header - filename)
+BS_FILE_LEN equ 512 - 16 - BANNER_LEN 
+
 [BITS 16]
 [ORG 0x7c00]
 
-entry:
-	jmp 0x0000:start    ; set CS:IP to known values
+entry:                           ; eliF header
+                                 ; 4 bytes application specific
+ 	    jmp endhdr               ;     near jump (2 bytes)
+lba     dw 1                     ;     starting sector LBA=1 (skip boot sector)
+
+        db 'eliF'                ; 4 byte magic
+        dd BS_FILE_LEN           ; 4 byte file length
+        dw 0                     ; 2 bytes reserved
+        db 1                     ; 1 byte status (STATUS_EXISTING)
+        db BANNER_LEN            ; 1 byte name length
+
+banner  db BANNER
+
+retries db 10   ; max 10 retries until fail
+
+endhdr:
+    jmp 0x0000:start    ; set CS:IP to known values
+
+start:
+    cli                 ; disable interrupts
+    xor ax, ax
+    mov ds, ax
+    mov ss, ax
+    mov sp, 0x7c00      ; just before the code
+
+%if 0
+; display banner
+    push dx
+    mov bx, 0x000f
+    mov ax, 0x1301
+    mov cx, BANNER_LEN
+    mov dx, 0x1701
+    mov bp, banner
+    int 0x10
+    pop dx 
+%endif
+
+    call enable_A20
+
+    call resetdisk
+
+    mov si, 0x7000      ; drive parameters buffer
+
+%define BOOT_DRIVE       byte [si]
+%define NUM_CYLINDERS    word [si+0x04] ; dword [0x7004]
+%define NUM_HEADS        word [si+0x08] ; dword [0x7008]
+%define SECTOR_PER_TRACK word [si+0x0c] ; dword [0x700C]
+%define TOTAL_SECTORS    word [si+0x10] ; qword [0x7010]
+%define PARA_PER_SECTOR  word [si+0x18] ;  word [0x7018] (in bytes at first)
+
+    mov BOOT_DRIVE, dl   ; save off boot drive before 13/08 trashes it
+    mov ah, 0x08
+    int 0x13
+    jnc parmsok
+
+    mov al, '&'
+    call putc
+    hlt
+
+parmsok:
+    mov word PARA_PER_SECTOR, 0x20 ; 512 bytes/sector is 32 paragraphs
+
+; set up parameters for LBAtoCHS
+
+;;; unnecessary
+;    push cx
+;    shr cx, 6
+;    mov NUM_CYLINDERS, cx   ; max value of cylinder
+;    pop cx
+
+    and cx, 0x3f        ; mask off lower two bits of cylinder
+    mov SECTOR_PER_TRACK, cx ; max value of sector
+
+    shr dx, 8           ; dx = dh (# heads)
+    inc dx
+    mov NUM_HEADS, dx
+
+    mov cx, 1165        ; read 600k at most (up to 2k below 640k)
+
+    mov ax, 0x0800
+    mov es, ax
+
+    sub cx, [lba] ; # sectors to read = total sectors - 1 boot sector
+
+nextsector:
+    mov ax, [lba]
+    push cx
+
+    xor dx, dx               ; DX:AX = LBA
+    mov bx, SECTOR_PER_TRACK ; BX = SectorsPerTrack
+    mov cx, NUM_HEADS        ; CX = NumHeads
+
+; in: DX:AX=LBA Sector, BX=SectorsPerTrack, CX = NumHeads
+; out: DH, CX compatible with int 13h/02
+LBAtoCHS:
+    div bx           ; ax = LBA/SectorsPerTrack = track# * head#
+
+    inc dx           ; dx = remainder+1 = sector#
+    push dx
+    xor dx, dx       ; dx:ax = track# * head#
+    div cx           ; ax = track#, dx = head#
+
+    mov dh, dl       ; dh = head#
+    pop cx           ; cl[5:0] = sector#
+
+    mov ch, al       ; ch = low 8 bits of track#
+    shl ah, 6
+    or cl, ah        ; cl[7:6] = high bits of track#
+     
+    mov dl, BOOT_DRIVE
+    xor bx, bx          ; ES:BX = dest address for load
+    mov ax, 0x0201      ; function 13h/02, read 01 sectors
+    int 0x13
+    jnc success
+
+    mov al, '!'
+    call putc
+    ; DEBUG: print ah for error code
+    call resetdisk
+    pop cx
+
+    dec byte [retries]
+    jnz nextsector
+
+    mov al, '<'
+    call putc
+
+    ; might be an odd-shaped disk, let's jump anyway
+    jmp leap
+
+success:
+%ifdef DEBUG
+    mov al, '.'
+    call putc
+%endif
+
+    mov ax, es
+    add ax, PARA_PER_SECTOR  ; shift the destination segment by bytes/sector
+    mov es, ax
+
+    pop cx
+    inc word [lba]
+    loop nextsector
+
+%ifdef DEBUG
+    mov al, '>'
+    call putc
+%endif
+
+leap:
+    lgdt [GDT]                      ; ge
+    mov eax, cr0                    ; ro
+    or al, 1                        ; ni
+    mov cr0, eax                    ; mo
+    jmp 0x08:protmain               ; !!
 
 putc:
     push ax
@@ -60,134 +219,6 @@ enable_A20: ; from wiki.osdev.org
 
     call a20wait
     ret
-
-retries     db 10   ; max 10 retries until fail
-current_lba dw 1    ; starting sector (skip boot sector)
-
-start:
-    cli                 ; disable interrupts
-    xor ax, ax
-    mov ds, ax
-    mov ss, ax
-    mov sp, 0x7c00      ; just before the code
-
-    call enable_A20
-
-    call resetdisk
-
-    mov si, 0x7000      ; drive parameters buffer
-
-%define BOOT_DRIVE       byte [si]
-%define NUM_CYLINDERS    word [si+0x04] ; dword [0x7004]
-%define NUM_HEADS        word [si+0x08] ; dword [0x7008]
-%define SECTOR_PER_TRACK word [si+0x0c] ; dword [0x700C]
-%define TOTAL_SECTORS    word [si+0x10] ; qword [0x7010]
-%define PARA_PER_SECTOR  word [si+0x18] ;  word [0x7018] (in bytes at first)
-
-    mov BOOT_DRIVE, dl   ; save off boot drive before 13/08 trashes it
-    mov ah, 0x08
-    int 0x13
-    jnc parmsok
-
-    mov al, '&'
-    call putc
-    hlt
-
-parmsok:
-    mov word PARA_PER_SECTOR, 0x20 ; 512 bytes/sector is 32 paragraphs
-
-; set up parameters for LBAtoCHS
-
-;;; unnecessary
-;    push cx
-;    shr cx, 6
-;    mov NUM_CYLINDERS, cx   ; max value of cylinder
-;    pop cx
-
-    and cx, 0x3f        ; mask off lower two bits of cylinder
-    mov SECTOR_PER_TRACK, cx ; max value of sector
-
-    shr dx, 8           ; dx = dh (# heads)
-    inc dx
-    mov NUM_HEADS, dx
-
-    mov cx, 1165        ; read 600k at most (up to 2k below 640k)
-
-    mov ax, 0x0800
-    mov es, ax
-
-    sub cx, [current_lba] ; # sectors to read = total sectors - 1 boot sector
-
-nextsector:
-    mov ax, [current_lba]
-    push cx
-
-    xor dx, dx               ; DX:AX = LBA
-    mov bx, SECTOR_PER_TRACK ; BX = SectorsPerTrack
-    mov cx, NUM_HEADS        ; CX = NumHeads
-
-; in: DX:AX=LBA Sector, BX=SectorsPerTrack, CX = NumHeads
-; out: DH, CX compatible with int 13h/02
-LBAtoCHS:
-    div bx           ; ax = LBA/SectorsPerTrack = track# * head#
-
-    inc dx           ; dx = remainder+1 = sector#
-    push dx
-    xor dx, dx       ; dx:ax = track# * head#
-    div cx           ; ax = track#, dx = head#
-
-    mov dh, dl       ; dh = head#
-    pop cx           ; cl[5:0] = sector#
-
-    mov ch, al       ; ch = low 8 bits of track#
-    shl ah, 6
-    or cl, ah        ; cl[7:6] = high bits of track#
-     
-    mov dl, BOOT_DRIVE
-    xor bx, bx          ; ES:BX = dest address for load
-    mov ax, 0x0201      ; function 13h/02, read 01 sectors
-    int 0x13
-    jnc success
-    mov al, '!'
-    call putc
-    ; DEBUG: print ah for error code
-    call resetdisk
-    pop cx
-
-    dec byte [retries]
-    jnz nextsector
-
-    mov al, '<'
-    call putc
-
-    ; might be an odd-shaped disk, let's jump anyway
-    jmp leap
-
-success:
-%ifdef DEBUG
-    mov al, '.'
-    call putc
-%endif
-
-    mov ax, es
-    add ax, PARA_PER_SECTOR  ; shift the destination segment by bytes/sector
-    mov es, ax
-
-    pop cx
-    inc word [current_lba]
-    loop nextsector
-
-%ifdef DEBUG
-    mov al, '>'
-    call putc
-%endif
-
-leap:
-    lgdt [GDT]                      ; ge
-    mov eax, cr0                    ; ro
-    or al, 1                        ; ni
-    mov cr0, eax                    ; mo
-    jmp 0x08:protmain               ; !!
 
 ; --- protected mode ---
 [bits 32]

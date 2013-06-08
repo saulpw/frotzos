@@ -61,8 +61,7 @@ page_fault(u32 errcode)
             int diskoffset = faultaddr - DISK0_MAP_ADDR;
             int pagenum = diskoffset >> 12;
 
-            // skip boot sector
-            lba = pagenum * 8 + 1;
+            lba = pagenum * 8;
         }
         else
         {

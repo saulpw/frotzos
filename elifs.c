@@ -54,7 +54,7 @@ elifs_read(const char *filename)
     {
         const struct fz_filehdr *h = hdrs[i];
         if (h->status == STATUS_EXISTING && 
-                strncmp(h->name, filename, elif_fnlen(h)) == 0)
+                strncmp(h->name, filename, h->namelength) == 0)
         {
             return h;
         }
@@ -84,7 +84,7 @@ elifs_write(const char *filename, const char *data, size_t length)
             // TODO: check for same filename and possibly reuse file
         } else if (h->status == STATUS_DELETED) {
             // maybe we can use it
-            if (elif_length(h) >= length) {
+            if (h->length >= length) {
                 break;
             }
         } else if (h->status == STATUS_SENTINEL) {
@@ -102,9 +102,9 @@ elifs_write(const char *filename, const char *data, size_t length)
     // room, or to the end of the elifs
   
     int fnlen = strlen(filename) + 1;
-    if (fnlen > MAX_FILENAME_LEN) {
+    if (fnlen > MAX_NAME_LEN) {
         kprintf("filename length is %d (max length %d)\r\n",
-                    fnlen, MAX_FILENAME_LEN);
+                    fnlen, MAX_NAME_LEN);
         return NULL;
     }
 
@@ -114,10 +114,8 @@ elifs_write(const char *filename, const char *data, size_t length)
     memset(h, 0, sizeof(struct fz_filehdr) + fnlen);
     h->magic = ELIFS_MAGIC;
     h->length = length;
-    h->length_msw = 0;
-    h->reserved = 0;
     h->status = STATUS_EXISTING;
-    h->namelength = (fnlen <= 128) ? fnlen : (fnlen/16);
+    h->namelength = fnlen;
     strcpy(h->name, filename);
 
     void *mmap_data = elif_data(h);
@@ -137,7 +135,7 @@ elifs_sync(struct fz_filehdr *hdr)
 {
     const uint8_t *ptr = (const uint8_t *) hdr;
     unsigned int i;
-    for (i=0; i < 16 + elif_fnlen(hdr) + elif_length(hdr); i += 512)
+    for (i=0; i < 16 + hdr->namelength + hdr->length; i += 512)
     {
         if (write_sector(&ptr[i]) < 0)
            return -1;
@@ -146,22 +144,9 @@ elifs_sync(struct fz_filehdr *hdr)
     return 0;
 }
 
-uint64_t elif_length(const struct fz_filehdr *h)
-{
-    uint64_t ret = h->length_msw;
-    ret <<= 32;
-    ret += h->length;
-    return ret;
-}
-
-int elif_fnlen(const struct fz_filehdr *h)
-{
-    return (h->namelength < 128) ? h->namelength : 16*(h->namelength - 120);
-}
-
 void *elif_data(const struct fz_filehdr *h)
 {
-    return ((void *) h) + 16 + elif_fnlen(h);
+    return ((void *) h) + 16 + h->namelength;
 }
 
 

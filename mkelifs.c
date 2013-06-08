@@ -58,8 +58,7 @@ main(int argc, char * const argv[])
 
         int namelen = strlen(infn)+1;
         if (namelen & 0xf) namelen = (namelen + 16) & ~0x0f; // pad fn
-        if (namelen > 128) namelen = (namelen / 16) + 120;
-        assert(namelen < 256);
+        assert(namelen < MAX_NAME_LEN);
 
         int hdrlen = sizeof(struct fz_filehdr) + namelen;
         char hdrbuf[hdrlen];
@@ -93,14 +92,6 @@ main(int argc, char * const argv[])
         fclose(fpin);
         fprintf(stderr, "\n");
     }
-
-    // extend file to be a multiple of 4k
-
-    char buf[4096] = { 0 };
-    int nwritten = ftell(fpout);
-    int totaln = (nwritten + 4096) & ~0xfff;
-    fprintf(stderr, "extending by %d bytes to multiple of 4k\n", totaln - nwritten);
-    fwrite(buf, 1, totaln - nwritten, fpout);
 
     fclose(fpout);
 
