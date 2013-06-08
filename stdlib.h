@@ -8,7 +8,12 @@ typedef signed int time_t;
 
 #define NULL ((void *) 0)
 
-#define assert(X) do { if (!(X)) { os_fatal("assert failed: " #X); } \
+extern void __assert_failure(const char *msg);
+
+#define assert(X) do { \
+        if (!(X)) {  \
+            __assert_failure("assert failed: " #X); \
+        } \
     } while (0)
 
 extern time_t time(time_t *t);

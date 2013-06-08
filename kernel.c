@@ -27,3 +27,10 @@ void syscall_handler(int syscallnum)
 {
 
 }
+
+void __assert_failure(const char *msg)
+{
+    kprintf("%s\r\n", msg);
+    halt();
+}
+

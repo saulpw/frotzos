@@ -51,7 +51,7 @@ void exception_handler(u32 exc, u32 errcode,
         case 18: // machine check
         case 19: // simd fpe
         default:
-            kprintf("Unhandled exception %d: eip=0x%x\r\n", exc, eip);
+            kprintf("Unhandled exception %d at EIP=%08X  ESP=%08X  EBP=%08X\r\n", exc, eip, esp, ebp);
             halt();
     };
 }
@@ -62,6 +62,7 @@ extern u32 irq_stage0_start, irq_stage0_fixup, irq_stage0_end;
 extern u32 exc_stage0_start, exc_stage0_fixup, exc_stage0_end;
 extern u32 excerr_stage0_start, excerr_stage0_fixup, excerr_stage0_end;
 extern u32 syscall_stage0_start, syscall_stage0_fixup, syscall_stage0_end;
+extern u32 asm_halt;
 
 static void
 create_handler(u8 *h, void *start, void *fixup, void *end, int intnum)
@@ -97,7 +98,11 @@ create_idt(u32 *idt) // and also stage0 interrupt stubs after the IDT
     int i;
     for (i=0; i < NUM_INTERRUPTS; ++i)
     {
-        set_idt_entry(&idt[i*2], handler_addr);
+        if (i == 8) { // double fault
+            set_idt_entry(&idt[i*2], (u8 *) asm_halt);
+        } else {
+            set_idt_entry(&idt[i*2], handler_addr);
+        }
 
         if (i == 8 || i == 10 || i == 11 || i == 12 || 
                       i == 13 || i == 14 || i == 17)    // with errcode
