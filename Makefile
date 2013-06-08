@@ -2,16 +2,18 @@
 FROTZDIR=frotz
 FROTZLIB=frotz_common.a
 
-BINS=mkfzimg bootloader.bin frotz.bin $(FROTZLIB)
+BINS=mkelifs bootloader.bin frotz.bin $(FROTZLIB)
 
 ARCHFLAGS= -ffreestanding -m32 -nostdlib -nostdinc -nostartfiles -nodefaultlibs
 INCLUDES= -I$(FROTZDIR)/src/common -I.
 WARNFLAGS=-Wall -Wextra -Werror -Wno-pointer-sign -Wno-unused
-CFLAGS += -ggdb -O2 $(ARCHFLAGS) $(INCLUDES) $(WARNFLAGS)
+CFLAGS += -ggdb $(ARCHFLAGS) $(INCLUDES) $(WARNFLAGS)
 
 ifdef DEBUG
 	CFLAGS += -DDEBUG=kprintf
 	ASMFLAGS += -DDEBUG=1
+else
+	CFLAGS += -O2
 endif
 
 MALLOC_CFLAGS= -O3 -DLACKS_UNISTD_H -DLACKS_FCNTL_H -DLACKS_SYS_PARAM_H  \
@@ -62,7 +64,10 @@ frotz.bin: $(FROTZLIB) kmain.o $(FZ_OBJS) linker.ld
 frotz.elf: $(FROTZLIB) kmain.o $(FZ_OBJS) linker.ld
 	ld -m elf_i386 -T linker.ld -o $@ $(FZ_OBJS) $(FROTZLIB)
 
-mkfzimg: mkfzimg.c
+mkelifs: mkelifs.c
+	gcc -ggdb -o $@ $<
+
+xelifs: xelifs.c
 	gcc -ggdb -o $@ $<
 
 .c.o:
@@ -77,11 +82,11 @@ bootloader.bin: bootloader.asm
 %.o: %.asm
 	nasm $(ASMFLAGS) -f elf -o $@ $<
 
-%.simplefs:	%.z5 mkfzimg frotz.bin
-	./mkfzimg -o $@ frotz.bin $<
+%.simplefs:	%.z5 mkelifs frotz.bin
+	./mkelifs -o $@ frotz.bin $<
 
-%.simplefs:	%.z8 mkfzimg frotz.bin
-	./mkfzimg -o $@ frotz.bin $<
+%.simplefs:	%.z8 mkelifs frotz.bin
+	./mkelifs -o $@ frotz.bin $<
 
 %.img: %.simplefs bootloader.bin frotz.elf
 	cat bootloader.bin $< > $@

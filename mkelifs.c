@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <libgen.h> // basename
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -14,7 +15,7 @@ int
 main(int argc, char * const argv[])
 {
     int opt;
-    const char *outfn = "floppy.img";
+    const char *outfn = "elifs.img";
 
     assert(sizeof(struct fz_filehdr) == 16);
 
@@ -65,11 +66,11 @@ main(int argc, char * const argv[])
         memset(hdrbuf, 0, hdrlen);
 
         struct fz_filehdr *hdr = (struct fz_filehdr *) hdrbuf;
-        hdr->magic = MAGIC;
+        hdr->magic = ELIFS_MAGIC;
         hdr->length = nbytes;
         hdr->status = STATUS_EXISTING;
         hdr->namelength = namelen;
-        strcpy(hdr->name, infn);
+        strcpy(hdr->name, basename(infn));
 
         size_t n = fwrite(hdr, sizeof(*hdr) + namelen, 1, fpout);
         assert(n == 1);
