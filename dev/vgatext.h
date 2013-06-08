@@ -35,6 +35,6 @@ static inline volatile unsigned char *vga_charptr(int x, int y)
 }
 
 static inline unsigned char bold(unsigned char c) { return c | 0x08; }
-static inline unsigned char blink(unsigned char c) { return c | 0x08; }
+static inline unsigned char blink(unsigned char c) { return c | 0x80; }
 
 #endif
