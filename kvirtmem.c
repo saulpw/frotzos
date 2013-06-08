@@ -28,6 +28,8 @@ page_fault(u32 errcode)
 {
     u32 faultaddr = get_cr2();
 
+    DEBUG("page fault at 0x%x\r\n", faultaddr);
+
     if (faultaddr < 0x1000) {
         kprintf("NULL page fault at 0x%x\r\n", faultaddr);
         halt();
@@ -42,35 +44,77 @@ page_fault(u32 errcode)
     // fill in page table entry with free page
     PAGE_TABLES[faultaddr >> 12] = get_phys_page() | 0x3; // RW + PRESENT
 
-    if (faultaddr >= DISK_MAP_ADDR && faultaddr < DISK_MAP_ADDR_MAX)
+    void *pageaddr = (void *) (faultaddr & 0xfffff000);
+
+    if (faultaddr < DISK0_MAP_ADDR || faultaddr >= DISK1_MAP_ADDR_MAX)
     {
-        // 256MB-3.8GB is mmap'ed disk
-        // if page backed by disk, load from disk
-        
-        int diskoffset = faultaddr - DISK_MAP_ADDR;
-        int pagenum = diskoffset >> 12;
-        int sectornum = pagenum * 8;
-        int lba = sectornum + 1;
+        memset(pageaddr, 0, 4096);
+    }
+    else
+    {
+        int devnum = 0;
+        int diskoffset = 0;
+        int lba = 0;
 
-        void *dest = (void *) (faultaddr & 0xfffff000);
+        if (faultaddr >= DISK0_MAP_ADDR && faultaddr < DISK0_MAP_ADDR_MAX)
+        {
+            int diskoffset = faultaddr - DISK0_MAP_ADDR;
+            int pagenum = diskoffset >> 12;
 
-        int rc = reg_pio_data_in_lba28(0    // device
+            // skip boot sector
+            lba = pagenum * 8 + 1;
+        }
+        else
+        {
+            devnum = 1;
+            int diskoffset = faultaddr - DISK1_MAP_ADDR;
+            int pagenum = diskoffset >> 12;
+            lba = pagenum * 8;
+        }
+
+        int rc = reg_pio_data_in_lba28(devnum   // device
                                      , CMD_READ_SECTORS
-                                     , 0    // feature
-                                     , 8    // sectorCount
-                                     , lba  // LBA
-                                     , dest // bufAddr
-                                     , 8    // numSect
-                                     , 0    // multiCnt
+                                     , 0        // feature
+                                     , 8        // sectorCount
+                                     , lba      // LBA
+                                     , pageaddr // bufAddr
+                                     , 8        // numSect
+                                     , 0        // multiCnt
                                      );
         if (rc != 0) {
             kprintf("unable to read page from disk");
             halt();
         }
-         
-    } else {
-        // otherwise bzero
-        memset((void *) (faultaddr & 0xfffff000), 0, 4096);
     }
 }
 
+int
+write_sector(const void *ptr)
+{
+    if (ptr < (void *) DISK1_MAP_ADDR || ptr > (void *) DISK1_MAP_ADDR_MAX) {
+        kprintf("ptr to write not on disk1");
+        return -1;
+    }
+
+    uint32_t diskoffset = (uint32_t) ptr - DISK1_MAP_ADDR;
+    int lba = diskoffset >> 9;
+
+    void *src = (void *) (((uint32_t) ptr) & 0xfffffe00);
+
+    DEBUG("writing sector %u from 0x%x\r\n", lba, src);
+
+    int rc = reg_pio_data_out_lba28(1    // writable device
+                                  , CMD_WRITE_SECTORS
+                                  , 0    // feature
+                                  , 1    // sectorCount
+                                  , lba  // LBA
+                                  , src  // bufAddr
+                                  , 1    // numSect
+                                  , 0    // multiCnt
+                                  );
+    if (rc != 0) {
+        kprintf("unable to write page to disk");
+        return -1;
+    }
+    return 0;
+}
