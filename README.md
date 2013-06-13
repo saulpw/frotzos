@@ -23,9 +23,12 @@ This builds a hard disk image that can be booted in a VM to run a .z5 program.
 
 ## TODO/bugs:
 
+* overwriting existing files
 * make second hard disk not required to play (only to save)
+* lost pig color glitch on first scroll
 * os_read_line positioning bug after timeout/continuation
 * extended characters (etude.z5/7)
+* interrupt driven ATA driver instead of PIO
 * beep/sound
 
 ## Gotchas
