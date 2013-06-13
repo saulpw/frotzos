@@ -94,7 +94,7 @@ extern unsigned int pio_bmide_base_addr;
 
 // Interrupts or polling mode - not zero to use interrrupts
 // Note: Interrupt mode is required for DMA
-#define INT_DEFAULT_INTERRUPT_MODE 0
+#define INT_DEFAULT_INTERRUPT_MODE 1
 
 // Command time out in seconds
 #define TMR_TIME_OUT 20

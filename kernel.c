@@ -1,5 +1,6 @@
 #include "kernel.h"
 #include "dev/time.h"
+#include "dev/ata.h"
 
 void
 init_kernel()
@@ -8,6 +9,8 @@ init_kernel()
     setup_timer();
 
     setup_interrupts(IDT_BASE);
+
+    dma_pci_config();
 }
 
 void *sbrk(int incr)

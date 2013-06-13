@@ -140,17 +140,17 @@ create_idt(u32 *idt) // and also stage0 interrupt stubs after the IDT
 void
 setup_pic(u8 master_int, u8 slave_int)
 {
-    out8(0x20, 0x11);        // expect ICW4
-    out8(0x21, master_int);  // IRQ0 is at INT master_int
-    out8(0x21, 0x04);        // slave is on IRQ2
-    out8(0x21, 0x01);        // manual EOI
-    out8(0x21, 0x0);         // unmask all ints
+    out8(0x20, 0x11);        // ICW1: init, expect ICW4
+    out8(0x21, master_int);  // ICW2: base address (int#) for IRQ0
+    out8(0x21, 0x04);        // ICW3: slave is on IRQ2
+    out8(0x21, 0x01);        // ICW4: manual EOI
+    out8(0x21, 0x0);         // OCW1: unmask all ints
 
-    out8(0xA0, 0x11);        // expect ICW4
-    out8(0xA1, slave_int);   // IRQ8 is at INT slave_int
-    out8(0xA1, 0x02);        // i am attached to IRQ2
-    out8(0xA1, 0x01);        // manual EOI
-    out8(0xA1, 0x0);         // unmask all ints
+    out8(0xA0, 0x11);        // ICW1: init, expect ICW4
+    out8(0xA1, slave_int);   // ICW2: base address (int#) for IRQ8
+    out8(0xA1, 0x02);        // ICW3: i am attached to IRQ2
+    out8(0xA1, 0x01);        // ICW4: manual EOI
+    out8(0xA1, 0x0);         // OCW1: unmask all ints
 }
 
 void

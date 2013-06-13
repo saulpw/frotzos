@@ -1676,8 +1676,7 @@ static int set_up_xfer( int dir, long bc, unsigned char * bufAddr )
    // write into BMIDE PRD address registers.
 
    dma_pci_num_prd = numPrd;
-   * (unsigned long *) (pio_bmide_base_addr + BM_PRD_ADDR_LOW )
-      = (unsigned long) prdBufPtr;
+   out32(pio_bmide_base_addr + BM_PRD_ADDR_LOW, (unsigned long) prdBufPtr);
 
    // set the read/write control:
    // PCI reads for ATA Write DMA commands,
@@ -2824,6 +2823,8 @@ SYSTEM_WAIT_INTR_OR_TIMEOUT()
 // Command time out in seconds
 #define TMR_TIME_OUT 20
 
+    asm volatile ("sti");
+
     while (seconds() - start < TMR_TIME_OUT)
     {
         if (ata_interrupt_received) {
@@ -2834,5 +2835,10 @@ SYSTEM_WAIT_INTR_OR_TIMEOUT()
     return 1;
 }
 
+void
+isr_ata()
+{
+    ata_interrupt_received = 1;
+}
 
 // end mindrvr.c

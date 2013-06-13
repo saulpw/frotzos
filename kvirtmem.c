@@ -71,15 +71,14 @@ page_fault(u32 errcode)
             lba = pagenum * 8;
         }
 
-        int rc = reg_pio_data_in_lba28(devnum   // device
-                                     , CMD_READ_SECTORS
-                                     , 0        // feature
-                                     , 8        // sectorCount
-                                     , lba      // LBA
-                                     , pageaddr // bufAddr
-                                     , 8        // numSect
-                                     , 0        // multiCnt
-                                     );
+        int rc = dma_pci_lba28(devnum   // device
+                             , CMD_READ_DMA
+                             , 0        // feature
+                             , 8        // sectorCount
+                             , lba      // LBA
+                             , (void *) 0x10000  // pageaddr // bufAddr
+                             , 8        // numSect
+                             );
         if (rc != 0) {
             kprintf("unable to read page from disk");
             halt();
