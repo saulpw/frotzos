@@ -12,13 +12,14 @@ typedef struct
 {
     struct fz_filehdr *hdr;
 
-    char *data;
+    unsigned char *data;
     unsigned long fpos;
 
     // if NULL, fwrites fail
     // otherwise, fwrites realloc data and fclose flushes
     char *path;
-    unsigned long datalen;   // current buffer size for writes
+    unsigned long datalen;    // current maximum buffer size for writes
+    unsigned long actualsize; // current length of file to be written
 } FILE;
 
 extern FILE *fopen(const char *path, const char *mode);

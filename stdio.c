@@ -31,6 +31,7 @@ FILE *fopen(const char *path, const char *mode)
     if (h) { // file for reading
         fp->data = elif_data(h);
     } else {
+
         fp->datalen = 256;
         fp->data = malloc(fp->datalen);
         fp->path = strdup(path);
@@ -42,7 +43,7 @@ FILE *fopen(const char *path, const char *mode)
 int fclose(FILE *fp)
 {
     if (fp->path != NULL) {
-        if (elifs_write(fp->path, fp->data, fp->fpos) == NULL) {
+        if (elifs_write(fp->path, fp->data, fp->actualsize) == NULL) {
             return EOF;
         }
         free(fp->data);
@@ -79,22 +80,23 @@ int fputc(int c, FILE *fp)
 
 int fseek(FILE *stream, long offset, int whence)
 {
+    long maxoff = stream->hdr ? stream->hdr->length : stream->actualsize;
     if (whence == SEEK_SET) {
-        if (offset > (long) stream->hdr->length) {
+        if (offset > maxoff) {
             return -1;
         }
         stream->fpos = offset;
     } else if (whence == SEEK_CUR) {
-        if (stream->fpos + offset > stream->hdr->length) {
+        if ((long) stream->fpos + offset > maxoff) {
             return -1;
         }
         stream->fpos += offset;
     } else if (whence == SEEK_END) {
-        if (offset > (long) stream->hdr->length) {
+        if (offset > maxoff) {
             return -1;
         }
 
-        stream->fpos = stream->hdr->length - offset;
+        stream->fpos = maxoff - offset;
     }
 
     return 0;
@@ -126,7 +128,7 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     }
 
     size_t n = size*nmemb;
-    DEBUG("fwrite(void *0x%08X, %u, FILE *0x%08X)\r\n", ptr, n, stream);
+//    DEBUG("fwrite(void *0x%08X, %u, FILE *0x%08X)\r\n", ptr, n, stream);
 
     while (stream->fpos + n > stream->datalen) {
         stream->datalen *= 2;
@@ -136,6 +138,9 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 
     memcpy(&stream->data[stream->fpos], ptr, n);
     stream->fpos += n;
+    if (stream->fpos > stream->actualsize) {
+        stream->actualsize = stream->fpos;
+    }
 
     return n / size;
 }

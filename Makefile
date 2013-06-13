@@ -58,11 +58,14 @@ $(FROTZLIB):
 	CFLAGS="-nostdinc -I.. -ggdb -march=i386 -m32" make -C $(FROTZDIR) src/$(FROTZLIB)
 	cp $(FROTZDIR)/src/$(FROTZLIB) .
 
-frotz.bin: $(FROTZLIB) kmain.o $(FZ_OBJS) linker.ld
-	ld -Map=$@.map -m elf_i386 --oformat binary -T linker.ld -o $@ $(FZ_OBJS) $(FROTZLIB)
-
 frotz.elf: $(FROTZLIB) kmain.o $(FZ_OBJS) linker.ld
 	ld -m elf_i386 -T linker.ld -o $@ $(FZ_OBJS) $(FROTZLIB)
+
+%.lst: %.elf
+	objdump -d $< > $@
+
+%.bin: %.elf
+	objcopy -O binary $< $@
 
 mkelifs: mkelifs.c
 	gcc -ggdb -o $@ $<
@@ -91,6 +94,9 @@ bootloader.bin: bootloader.asm
 %.img: %.simplefs bootloader.bin frotz.elf
 	cat bootloader.bin $< > $@
 	truncate --size=%4k $@
+
+%.vmdk: %.img
+	VBoxManage convertfromraw $< $@ --format VMDK
 
 clean:
 	make -C $(FROTZDIR) clean

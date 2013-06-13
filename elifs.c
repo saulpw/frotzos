@@ -58,7 +58,6 @@ elifs_read(const char *filename)
         {
             return h;
         }
-        DEBUG("skipping '%s'", h->name);
         i++;
     }
     return NULL;
