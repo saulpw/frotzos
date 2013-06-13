@@ -2,7 +2,7 @@
 
 a return to the golden era of bootable games
 
-This builds a floppy image that can be booted in a VM to run a .z5 program.
+This builds a hard disk image that can be booted in a VM to run a .z5 program.
 
 ## Features
 
@@ -18,15 +18,16 @@ This builds a floppy image that can be booted in a VM to run a .z5 program.
 
 ## To use the resulting image
 
-3. qemu-system-i386 [-fda] random.img
+3. truncate --size=1MB savedisk.img
+4. qemu-system-i386 random.img -hdb savedisk.img
 
 ## TODO/bugs:
 
+* make second hard disk not required to play (only to save)
 * os_read_line positioning bug after timeout/continuation
 * extended characters (etude.z5/7)
-* allow save games and transcripts, extractable with reverse engineering
 * beep/sound
 
 ## Gotchas
 
-* doesn't work as a hard disk on vmware/virtualbox
+* raw image doesn't work in VMWare/VirtualBox; convert to vmdk first

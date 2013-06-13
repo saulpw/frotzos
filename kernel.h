@@ -11,8 +11,11 @@ void kprintf(const char *fmt, ...);
 #define DEBUG(args...)
 #endif
 
+// physical memory
+#define FIRST_PHYS_PAGE        0x200000
+
 // virtual memory
-#define HEAP_ADDR              0x100000
+#define HEAP_ADDR              0x200000
 #define HEAP_ADDR_MAX          0xf00000
 #define DISK0_MAP_ADDR       0x10000000
 #define DISK0_MAP_ADDR_MAX   0xefffffff

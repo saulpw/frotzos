@@ -6,6 +6,8 @@
 ; (boot sector - elif header - filename)
 BS_FILE_LEN equ 512 - 16 - BANNER_LEN 
 
+LOWMEM_SECTOR equ 0x8000
+
 [BITS 16]
 [ORG 0x7c00]
 
@@ -31,6 +33,7 @@ start:
     cli                 ; disable interrupts
     xor ax, ax
     mov ds, ax
+    mov es, ax
     mov ss, ax
     mov sp, 0x7c00      ; just before the code
 
@@ -56,8 +59,8 @@ start:
 %define NUM_CYLINDERS    word [si+0x04] ; dword [0x7004]
 %define NUM_HEADS        word [si+0x08] ; dword [0x7008]
 %define SECTOR_PER_TRACK word [si+0x0c] ; dword [0x700C]
-%define TOTAL_SECTORS    word [si+0x10] ; qword [0x7010]
-%define PARA_PER_SECTOR  word [si+0x18] ;  word [0x7018] (in bytes at first)
+; %define TOTAL_SECTORS    word [si+0x10] ; qword [0x7010]
+; %define PARA_PER_SECTOR  word [si+0x18] ;  word [0x7018] (in bytes at first)
 
     mov BOOT_DRIVE, dl   ; save off boot drive before 13/08 trashes it
     mov ah, 0x08
@@ -69,8 +72,6 @@ start:
     hlt
 
 parmsok:
-    mov word PARA_PER_SECTOR, 0x20 ; 512 bytes/sector is 32 paragraphs
-
 ; set up parameters for LBAtoCHS
 
 ;;; unnecessary
@@ -88,8 +89,7 @@ parmsok:
 
     mov cx, 1165        ; read 600k at most (up to 2k below 640k)
 
-    mov ax, 0x0800
-    mov es, ax
+    mov edi, 0x100000
 
     sub cx, [lba] ; # sectors to read = total sectors - 1 boot sector
 
@@ -119,7 +119,7 @@ LBAtoCHS:
     or cl, ah        ; cl[7:6] = high bits of track#
      
     mov dl, BOOT_DRIVE
-    xor bx, bx          ; ES:BX = dest address for load
+    mov bx, LOWMEM_SECTOR ; ES:BX = dest address for load
     mov ax, 0x0201      ; function 13h/02, read 01 sectors
     int 0x13
     jnc success
@@ -144,10 +144,7 @@ success:
     mov al, '.'
     call putc
 %endif
-
-    mov ax, es
-    add ax, PARA_PER_SECTOR  ; shift the destination segment by bytes/sector
-    mov es, ax
+    call copy_sector
 
     pop cx
     inc word [lba]
@@ -164,6 +161,41 @@ leap:
     or al, 1                        ; ni
     mov cr0, eax                    ; mo
     jmp 0x08:protmain               ; !!
+
+[bits 16]
+copy_sector:
+    push ds
+    push es
+    push si
+
+    lgdt [GDT]                      ; ge
+    mov eax, cr0                    ; ro
+    or al, 1                        ; ni
+    mov cr0, eax                    ; mo
+    jmp 0x08:pmode_copy_sector
+
+[bits 32]
+pmode_copy_sector:
+    mov ax, 0x10
+    mov es, ax
+    mov ds, ax
+
+    mov esi, LOWMEM_SECTOR
+;    mov edi,  ; edi should already be fine
+    mov ecx, 512/4
+    rep movsd
+
+    mov eax, cr0
+    and al, 0xfe
+    mov cr0, eax
+    jmp 0000:end_copy_loop
+
+[bits 16]
+end_copy_loop:
+    pop si
+    pop es
+    pop ds
+    ret
 
 putc:
     push ax
@@ -263,7 +295,7 @@ protmain:
     mov dword [0x3ffc], 0x3003  ; entire pagetable itself
 
     mov edi, 0x4004      ; skip first page (null ptr)
-    mov ecx, 0x0ff       ; first megabyte only (0x400/4 - 1)
+    mov ecx, 0x1ff       ; 0-2MB only (0x400/4 - 1)
     mov eax, 0x1003      ; identity map; 3 = RW | PRESENT
 nextpage:
     stosd
@@ -275,8 +307,8 @@ nextpage:
     or eax, 0x80000000
     mov cr0, eax
 
-    mov eax, 0x8010      ; after 16-byte FILE header
-    add al, [0x800f]     ; + filename size
+    mov eax, 0x100010      ; after 16-byte FILE header
+    add al, [0x10000f]     ; + filename size
 
     call eax              ; kernel starts immediately
 

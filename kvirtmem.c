@@ -14,7 +14,7 @@ get_cr2()
 }
 
 // high-water mark for allocated physical pages
-static u32 nextpage = 0x100000;        // 1MB
+static u32 nextpage = FIRST_PHYS_PAGE;
 
 u32 get_phys_page()
 {

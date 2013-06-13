@@ -1,7 +1,7 @@
 ENTRY (kmain)
 STARTUP(kmain.o)
 
-. = 0x00008020;
+. = 0x00100020;
 
 SECTIONS
 {
