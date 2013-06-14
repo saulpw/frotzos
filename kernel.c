@@ -10,7 +10,9 @@ init_kernel()
 
     setup_interrupts(IDT_BASE);
 
+#ifdef ATA_DMA
     dma_pci_config();
+#endif
 }
 
 void *sbrk(int incr)

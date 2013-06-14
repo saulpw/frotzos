@@ -71,6 +71,7 @@ page_fault(u32 errcode)
             lba = pagenum * 8;
         }
 
+#ifdef ATA_DMA
         int rc = dma_pci_lba28(devnum   // device
                              , CMD_READ_DMA
                              , 0        // feature
@@ -79,6 +80,17 @@ page_fault(u32 errcode)
                              , (void *) 0x10000  // pageaddr // bufAddr
                              , 8        // numSect
                              );
+#else
+        int rc = reg_pio_data_in_lba28(devnum   // device
+                             , CMD_READ_SECTORS
+                             , 0        // feature
+                             , 8        // sectorCount
+                             , lba      // LBA
+                             , pageaddr // bufAddr
+                             , 8        // numSect
+                             , 0        // multicnt
+                             );
+#endif
         if (rc != 0) {
             kprintf("unable to read page from disk");
             halt();
@@ -90,7 +102,7 @@ int
 write_sector(const void *ptr)
 {
     if (ptr < (void *) DISK1_MAP_ADDR || ptr > (void *) DISK1_MAP_ADDR_MAX) {
-        kprintf("ptr to write not on disk1");
+        kprintf("ptr to write (0x%08X) not on disk1", ptr);
         return -1;
     }
 
@@ -111,8 +123,61 @@ write_sector(const void *ptr)
                                   , 0    // multiCnt
                                   );
     if (rc != 0) {
+        kprintf("unable to write sector to disk");
+        return -1;
+    }
+    return 0;
+}
+
+int
+write_page(u32 ptr)
+{
+    if (ptr < DISK1_MAP_ADDR || ptr > DISK1_MAP_ADDR_MAX) {
+        kprintf("page to write (0x%08X) not on disk1", ptr);
+        return -1;
+    }
+
+    void *src = (void *) (ptr & 0xfffff000);
+    uint32_t diskoffset = (uint32_t) src - DISK1_MAP_ADDR;
+    int lba = diskoffset >> 9;
+
+    DEBUG("writing page at lba %u from 0x%x\r\n", lba, src);
+
+    int rc = reg_pio_data_out_lba28(1    // writable device
+                                  , CMD_WRITE_SECTORS
+                                  , 0    // feature
+                                  , 8    // sectorCount
+                                  , lba  // LBA
+                                  , src  // bufAddr
+                                  , 8    // numSect
+                                  , 0    // multiCnt
+                                  );
+    if (rc != 0) {
         kprintf("unable to write page to disk");
         return -1;
     }
     return 0;
+}
+
+int
+is_dirty(u32 addr)
+{
+    return (PAGE_DIR[addr >> 22] & 0x01)     // page table itself is Present
+        && (PAGE_TABLES[addr >> 12] & 0x40); // DIRTY bit is set
+}
+
+int
+ksync()
+{
+    int ret = 0;
+    u32 ptr = DISK1_MAP_ADDR;
+    for ( ; ptr < DISK1_MAP_ADDR_MAX; ptr += 4096)
+    {
+        if (is_dirty(ptr)) {
+            DEBUG("page at 0x%08X is dirty, writing to disk\r\n", ptr);
+            if (write_page(ptr) != 0)
+                ret = -1; // but keep writing the rest
+        }
+    }
+    return ret;
 }

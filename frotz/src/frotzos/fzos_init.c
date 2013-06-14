@@ -34,15 +34,6 @@ void 	os_beep (int volume) { NOTIMPL; }
 
 int  	os_peek_colour (void) { NOTIMPL; return 0; }
 
-int os_read_file_name (char *fn, const char *default_fn, int flag)
-{
-    kprintf("using filename '%s'\r\n", default_fn);
-    int len = strlen(default_fn);
-    strncpy(fn, default_fn, MAX_FILE_NAME);
-    fn[len] = 0; 
-    return 1;
-}
-
 void os_restart_game (int stage) {}
 
 int os_random_seed (void)

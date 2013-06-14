@@ -1,3 +1,4 @@
+#include "kernel.h"
 #include "frotzos.h"
 #include "dev/kb.h"
 #include "dev/time.h"
@@ -158,3 +159,27 @@ os_read_line(int max, zchar *buf, int timeout, int width, int continued)
 
     return ZC_TIME_OUT;
 }
+
+int
+os_read_file_name (char *fn, const char *default_fn, int flag)
+{
+    char prompt[80] = { 0 };
+
+    snprintf(prompt, 80, "Filename to save as [%s]: ", default_fn);
+    os_display_string(prompt);
+
+    // XXX: check for quit characters
+    os_read_line(MAX_FILE_NAME, fn, 0, 80 - strlen(prompt), 0);
+
+    os_display_string("\n");
+
+    if (!fn[0]) {
+        int len = strlen(default_fn);
+        strncpy(fn, default_fn, MAX_FILE_NAME);
+        fn[len] = 0; 
+    }
+
+    DEBUG("using filename '%s'\r\n", fn);
+    return 1;
+}
+

@@ -25,7 +25,6 @@ typedef struct fz_filehdr {
 const struct fz_filehdr *elifs_read(const char *filename);
 const struct fz_filehdr *elifs_write(const char *filename,
                                      const char *data, size_t length);
-int elifs_sync(struct fz_filehdr *hdr);
 
 // get NULL-terminated array of files from both disks
 struct fz_filehdr * const * elifs_enumfiles();
