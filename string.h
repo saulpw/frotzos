@@ -13,6 +13,7 @@ extern char *strncpy(char *dest, const char *src, size_t n);
 extern void *memmove(void *dest, const void *src, size_t n);
 extern void *memset(void *s, int c, size_t n);
 extern void *memcpy(void *dest, const void *src, size_t n);
+extern int memcmp(const void *s1, const void *s2, size_t n);
 
 int snprintf(char *buf, unsigned int sz, const char *fmt, ...);
 
