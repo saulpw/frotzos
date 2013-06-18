@@ -28,51 +28,60 @@ page_fault(u32 errcode)
 {
     u32 faultaddr = get_cr2();
 
-    DEBUG("page fault at 0x%x\r\n", faultaddr);
-
     if (faultaddr < 0x1000) {
         kprintf("NULL page fault at 0x%x\r\n", faultaddr);
         halt();
     }
 
-    // check for valid entry in PAGE_DIR
-    if ((PAGE_DIR[faultaddr >> 22] & 0x1) == 0) // not present
-    {
-        PAGE_DIR[faultaddr >> 22] = get_phys_page() | 0x3;
+    if (errcode & 0x2) { // caused by page write    
+        if (PAGE_DIR[faultaddr >> 22] & 0x1) {
+            if ((PAGE_TABLES[faultaddr >> 12] & 0x3) == 0x1) {
+                // present but not writable
+                kprintf("invalid write to 0x%08X\r\n", faultaddr);
+                halt();
+            }
+        }
     }
 
-    // fill in page table entry with free page
-    PAGE_TABLES[faultaddr >> 12] = get_phys_page() | 0x3; // RW + PRESENT
+    DEBUG("page fault at 0x%x\r\n", faultaddr);
+
+    if ((errcode & 0x1) == 0x0) { // not present 
+        // check for valid entry in PAGE_DIR
+        if ((PAGE_DIR[faultaddr >> 22] & 0x1) == 0) // not present
+        {
+            PAGE_DIR[faultaddr >> 22] = get_phys_page() | 0x3;
+        }
+
+        // fill in page table entry with free page
+        PAGE_TABLES[faultaddr >> 12] = get_phys_page() | 0x3; // RW + PRESENT
+    }
 
     void *pageaddr = (void *) (faultaddr & 0xfffff000);
 
-    if (faultaddr < DISK0_MAP_ADDR || faultaddr >= DISK1_MAP_ADDR_MAX)
+    int disknum = -1;
+    int lba = 0;
+
+    if (faultaddr >= DISK0_MAP_ADDR && faultaddr < DISK0_MAP_ADDR_MAX)
     {
-        memset(pageaddr, 0, 4096);
+        unsigned int diskoffset = faultaddr - DISK0_MAP_ADDR;
+        unsigned int pagenum = diskoffset >> 12;
+
+        disknum = 0;
+        lba = pagenum * 8;
     }
-    else
+    else if (faultaddr >= DISK1_MAP_ADDR && faultaddr < DISK1_MAP_ADDR_MAX)
     {
-        int devnum = 0;
-        int diskoffset = 0;
-        int lba = 0;
+        unsigned int diskoffset = faultaddr - DISK1_MAP_ADDR;
+        unsigned int pagenum = diskoffset >> 12;
 
-        if (faultaddr >= DISK0_MAP_ADDR && faultaddr < DISK0_MAP_ADDR_MAX)
-        {
-            int diskoffset = faultaddr - DISK0_MAP_ADDR;
-            int pagenum = diskoffset >> 12;
+        lba = pagenum * 8;
+        disknum = 1;
+    }
 
-            lba = pagenum * 8;
-        }
-        else
-        {
-            devnum = 1;
-            int diskoffset = faultaddr - DISK1_MAP_ADDR;
-            int pagenum = diskoffset >> 12;
-            lba = pagenum * 8;
-        }
-
+    if (disknum != -1)
+    {
 #ifdef ATA_DMA
-        int rc = dma_pci_lba28(devnum   // device
+        int rc = dma_pci_lba28(disknum   // device
                              , CMD_READ_DMA
                              , 0        // feature
                              , 8        // sectorCount
@@ -81,7 +90,7 @@ page_fault(u32 errcode)
                              , 8        // numSect
                              );
 #else
-        int rc = reg_pio_data_in_lba28(devnum   // device
+        int rc = reg_pio_data_in_lba28(disknum   // device
                              , CMD_READ_SECTORS
                              , 0        // feature
                              , 8        // sectorCount
@@ -91,11 +100,23 @@ page_fault(u32 errcode)
                              , 0        // multicnt
                              );
 #endif
-        if (rc != 0) {
-            kprintf("unable to read page from disk");
-            halt();
+
+        // after reading the page from disk, make the page read-only if
+        //   it comes from disk0
+
+        if (disknum == 0) {
+            PAGE_TABLES[faultaddr >> 12] &= ~0x2; // not writable
         }
+
+        if (rc == 0) {
+            return;
+        }
+
+        kprintf("unable to read 0x%08X from disk%d (LBA=%d)\r\n", pageaddr, disknum, lba);
+        halt();
     }
+
+    memset(pageaddr, 0, 4096);
 }
 
 int
