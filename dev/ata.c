@@ -5,7 +5,7 @@
 // This code is based on the ATA/ATAPI-4,-5 and -6 standards and
 // on interviews with various ATA controller and drive designers.
 
-#include <io.h>
+#include "x86.h"
 #include "kernel.h"
 #include "dev/time.h"
 #include "dev/ata.h"

@@ -1,5 +1,5 @@
 #include "kernel.h"
-#include "io.h"
+#include "x86.h"
 #include "vgatext.h"
 #include "dev/time.h"
 

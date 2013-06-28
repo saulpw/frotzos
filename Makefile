@@ -131,7 +131,8 @@ LostPig.iso: LostPig.z8 bootkernel.bin isoboot.bin frotz.bin
 		-c boot.cat \
 		-no-emul-boot \
 		-boot-load-seg=0x7c0 \
-		-boot-load-size=16 \
+		-boot-load-size=1 \
+		-boot-info-table \
 		-input-charset=iso8859-1 \
 		-o $@ isoboot.bin frotz.bin $<
 

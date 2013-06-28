@@ -1,4 +1,4 @@
-#include "io.h"
+#include "x86.h"
 #include "vgatext.h"
 
 void vga_set_cursor(int x, int y)

@@ -1,6 +1,5 @@
 #include <assert.h>
 #include <string.h>
-#include "io.h"
 #include "x86.h"
 #include "kernel.h"
 #include "dev/ata.h"
@@ -107,24 +106,27 @@ page_fault(u32 errcode, const struct registers *regs)
             kprintf("unable to read 0x%08X from disk%d (LBA=%d)\r\n", pageaddr, disknum, lba);
         }
 #else
-        int i=0;
-        for (i=0; i < 8; ++i) {
-            int rc = reg_pio_data_in_lba28(disknum   // device
-                             , CMD_READ_SECTORS
-                             , 0        // feature
-                             , 1        // sectorCount
-                             , lba+i    // LBA
-                             , pageaddr + i*512 // bufAddr
-                             , 1        // numSect
-                             , 0        // multicnt
+//        if (*boot_drive == 0x80) {
+            int i=0;
+            for (i=0; i < 8; ++i) {
+                int rc = reg_pio_data_in_lba28(disknum   // device
+                                , CMD_READ_SECTORS
+                                , 0        // feature
+                                , 1        // sectorCount
+                                , lba+i    // LBA
+                                , pageaddr + i*512 // bufAddr
+                                , 1        // numSect
+                                , 0        // multicnt
                              );
-            if (rc != 0) {
-                DPRINT(0, "unable to read LBA %d from disk%d (0x%08X)", lba, disknum, pageaddr);
-                if (i == 0) {
-                    halt();
+                if (rc != 0) {
+                    DPRINT(0, "unable to read LBA %d from disk%d (0x%08X)", lba, disknum, pageaddr);
+                    if (i == 0) {
+                        halt();
+                    }
                 }
             }
-        }
+//        } else if (*boot_drive == 0xe0) {
+//        }
 #endif
 
         // after reading the page from disk, make the page read-only if

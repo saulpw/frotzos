@@ -1,6 +1,6 @@
 #include <sys/types.h>
 #include <string.h>
-#include "io.h"
+#include "x86.h"
 #include "kernel.h"
 #include "dev/kb.h"
 #include "dev/time.h"
