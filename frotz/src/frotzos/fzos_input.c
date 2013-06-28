@@ -179,7 +179,7 @@ os_read_file_name (char *fn, const char *default_fn, int flag)
         fn[len] = 0; 
     }
 
-    DEBUG("using filename '%s'\r\n", fn);
+    DPRINT(1, "using filename '%s'", fn);
     return 1;
 }
 

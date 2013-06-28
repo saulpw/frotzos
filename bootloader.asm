@@ -14,8 +14,9 @@ LOWMEM_SECTOR equ 0x8000
 entry:                           ; eliF header
                                  ; 4 bytes application specific
  	    jmp endhdr               ;     near jump (2 bytes)
-lba     dw 1                     ;     starting sector LBA=1 (skip boot sector)
+lba     dw 0                     ;     starting sector LBA=0 (incl. boot sector)
 
+%if 0
         db 'eliF'                ; 4 byte magic
         dd BS_FILE_LEN           ; 4 byte file length
         dw 0                     ; 2 bytes reserved
@@ -23,6 +24,7 @@ lba     dw 1                     ;     starting sector LBA=1 (skip boot sector)
         db BANNER_LEN            ; 1 byte name length
 
 banner  db BANNER
+%endif
 
 retries db 10   ; max 10 retries until fail
 
@@ -87,9 +89,9 @@ parmsok:
     inc dx
     mov NUM_HEADS, dx
 
-    mov cx, 1165        ; read 600k at most (up to 2k below 640k)
+    mov cx, 64          ; read inital 32k
 
-    mov edi, 0x100000
+    mov edi, 0x8000
 
     sub cx, [lba] ; # sectors to read = total sectors - 1 boot sector
 
@@ -119,8 +121,8 @@ LBAtoCHS:
     or cl, ah        ; cl[7:6] = high bits of track#
      
     mov dl, BOOT_DRIVE
-    mov bx, LOWMEM_SECTOR ; ES:BX = dest address for load
-    mov ax, 0x0201      ; function 13h/02, read 01 sectors
+    mov bx, di       ; ES:BX = dest address for load
+    mov ax, 0x0201   ; function 13h/02, read 01 sectors
     int 0x13
     jnc success
 
@@ -144,7 +146,7 @@ success:
     mov al, '.'
     call putc
 %endif
-    call copy_sector
+    add di, 512
 
     pop cx
     inc word [lba]
@@ -162,6 +164,7 @@ leap:
     mov cr0, eax                    ; mo
     jmp 0x08:protmain               ; !!
 
+%if 0
 [bits 16]
 copy_sector:
     push ds
@@ -196,6 +199,7 @@ end_copy_loop:
     pop es
     pop ds
     ret
+%endif
 
 putc:
     push ax
@@ -307,9 +311,7 @@ nextpage:
     or eax, 0x80000000
     mov cr0, eax
 
-    mov eax, 0x100010      ; after 16-byte FILE header
-    add al, [0x10000f]     ; + filename size
-
+    mov eax, 0x8200
     call eax              ; kernel starts immediately
 
 _halt:

@@ -2,40 +2,35 @@
 #include "dev/time.h"
 #include "dev/ata.h"
 
+#include "iso9660.h"
+#include "DiskFile.h"
+
 void
-init_kernel()
+do_kernel()
 {
-    DEBUG("starting frotzos\r\n");
+    init_pagetable();
+    DPRINT(0, "starting frotzos");
     setup_timer();
 
     setup_interrupts(IDT_BASE);
 
+    init_syscalls();
+
 #ifdef ATA_DMA
     dma_pci_config();
 #endif
-}
+    setup_hdd();
 
-void *sbrk(int incr)
-{
-    static void *nextalloc = (void *) HEAP_ADDR;
-    void *ret = nextalloc;
+    const DiskFile * files = iso9660_enumfiles();
 
-    nextalloc += incr;
-    if (nextalloc > (void *) HEAP_ADDR_MAX) {
-        kprintf("sbrk(%u) would go over 0x%x", incr, HEAP_ADDR_MAX);
-        halt();
-    }
-    return ret;
-}
+    const char *argv[3] = { files[3].filename, files[5].filename, 0 };
 
-void syscall_handler(int syscallnum)
-{
+    __builtin_memcpy((void *) 0x1000000, files[3].data, files[3].length);
 
-}
+    void (*appmain)();
+    appmain = (void (*)()) 0x1000000;
+    appmain(2, argv);
 
-void __assert_failure(const char *msg)
-{
-    kprintf("%s\r\n", msg);
-    halt();
+//    execve(argv[0], argv, NULL);
 }
 

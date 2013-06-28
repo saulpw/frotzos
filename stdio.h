@@ -10,9 +10,11 @@
 
 typedef struct
 {
-    struct fz_filehdr *hdr;
+    struct DiskFile *hdr;
 
     unsigned char *data;
+    unsigned long data_len;
+
     unsigned long fpos;
 
     // if NULL, fwrites fail

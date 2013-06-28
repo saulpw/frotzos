@@ -25,7 +25,9 @@ and jumps to kernel.
 (page 0) 0x 0000 - 0x 07ff: real mode IDT and bios data
 (page 1) 0x 1000 - 0x 11ff: IDT (64 entries)
          0x 1200 - 0x 1aff: ISR stage0 stubs
-(page 2)                  :
+(page 2) 0x 2000 - 0x 2003: parm stack pointer
+         0x 2004 - 0x 27ff: syscall parameter stack (grows down)
+         0x 2800 - 0x 28ff: 'syscall' table
 (page 3)                  : PDE
 (page 4)                  : PT0
 (page 5)                  : application/kernel stack (grows down)

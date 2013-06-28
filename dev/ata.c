@@ -1,45 +1,15 @@
-//********************************************************************
-// MINIMUM ATA LOW LEVEL I/O DRIVER -- MINDRVR.C
+// MINIMUM ATA LOW LEVEL I/O DRIVER -- ata.c
 //
-// by Hale Landis (hlandis@ata-atapi.com)
-//
-// There is no copyright and there are no restrictions on the use
-// of this ATA Low Level I/O Driver code.  It is distributed to
-// help other programmers understand how the ATA device interface
-// works and it is distributed without any warranty.  Use this
-// code at your own risk.
-//
-// Minimum ATA Driver (MINDRVR) is a subset of ATADRVR. MINDRVR
-// has a single header file and a single C file. MINDRVR can
-// be used as the starting point for an ATADRVR for an embedded
-// system. NOTE all the places in the MINDRVR.H and MINDRVR.C files
-// where there is a comment containing the string "!!!".
-//
-// Use the header file mindrvr.h in any C files that call MINDRVR
-// functions.
+// originally by Hale Landis (hlandis@ata-atapi.com)
 //
 // This code is based on the ATA/ATAPI-4,-5 and -6 standards and
 // on interviews with various ATA controller and drive designers.
-//
-// Note that MINDRVR does not support ATA CHS addressing.
-//
-// Most of the MINDRVR code is standard C code and should compile
-// using any C compiler. It has been tested using Borland C/C++ 4.5.
-//
-// This C source file is the header file for the driver
-// and is used in the MINDRVR.C files and must also be used
-// by any program using the MINDRVR code/functions.
-//********************************************************************
 
 #include <io.h>
 #include "kernel.h"
 #include "dev/time.h"
 #include "dev/ata.h"
 
-//**************************************************************
-//
-// !!! data that functions outside of MINDRVR must use
-//
 // Note that there is no actual "interrupt handler" provide in
 // MINDRVR. The interrupt handler is usually a small function that
 // is very system specific. However, MINDRVR expects that interrupt

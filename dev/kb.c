@@ -42,7 +42,7 @@ isr_keyboard()
     // else "kb queue is full";
 }
 
-int
+unsigned int
 get_scancode()
 {
     if (kqback == kqfront) { // queue is empty
@@ -54,7 +54,7 @@ get_scancode()
     return k;
 }
 
-int
+unsigned int
 get_key()
 {    
     static int depressed[256] = { 0 }; // currently depressed keys
@@ -113,6 +113,6 @@ get_key()
         if (ch > 0)
             return ch | shifts;
 
-        DEBUG("unknown scancode 0x%x\r\n", scancode);
+//        DEBUG("unknown scancode 0x%x\r\n", scancode);
     }
 }

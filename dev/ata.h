@@ -1,55 +1,21 @@
-//********************************************************************
-// MINIMUM ATA LOW LEVEL I/O DRIVER -- MINDRVR.H
+// MINIMUM ATA LOW LEVEL I/O DRIVER -- ata.h
 //
-// by Hale Landis (hlandis@ata-atapi.com)
-//
-// There is no copyright and there are no restrictions on the use
-// of this ATA Low Level I/O Driver code.  It is distributed to
-// help other programmers understand how the ATA device interface
-// works and it is distributed without any warranty.  Use this
-// code at your own risk.
-//
-// Minimum ATA Driver (MINDRVR) is a subset of ATADRVR. MINDRVR
-// has a single header file and a single C file. MINDRVR can
-// be used as the starting point for an ATADRVR for an embedded
-// system. NOTE all the places in the MINDRVR.H and MINDRVR.C files
-// where there is a comment containing the string "!!!".
-//
-// Use the header file mindrvr.h in any C files that call MINDRVR
-// functions.
+// originally written by Hale Landis (hlandis@ata-atapi.com)
 //
 // This code is based on the ATA/ATAPI-4,-5 and -6 standards and
 // on interviews with various ATA controller and drive designers.
 //
-// Note that MINDRVR does not support ATA CHS addressing.
-//
-// Most of the MINDRVR code is standard C code and should compile
-// using any C compiler. It has been tested using Borland C/C++ 4.5.
-//
-// This C source file is the header file for the driver
-// and is used in the MINDRVR.C files and must also be used
-// by any program using the MINDRVR code/functions.
-//********************************************************************
+#include <stdint.h>
+
+typedef uint8_t  u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
 
 #define MIN_ATA_DRIVER_VERSION "0H"
 
-//********************************************************************
-//
-// !!! What parts of MINDRVR do you want in your build?
-//
-//********************************************************************
-
 #define INCLUDE_ATA_DMA   1   // not zero to include ATA_DMA
-
-#define INCLUDE_ATAPI_PIO 0   // not zero to include ATAPI PIO
-
-#define INCLUDE_ATAPI_DMA 0   // not zero to include ATAPI DMA
-
-//********************************************************************
-//
-// !!! System specific functions and data you must supply
-//
-//********************************************************************
+#define INCLUDE_ATAPI_PIO 1   // not zero to include ATAPI PIO
+#define INCLUDE_ATAPI_DMA 1   // not zero to include ATAPI DMA
 
 // You must supply a function that waits for an interrupt from the
 // ATA controller. This function should return 0 when the interrupt
@@ -63,30 +29,20 @@ extern int SYSTEM_WAIT_INTR_OR_TIMEOUT( void );
 
 extern long SYSTEM_READ_TIMER( void );
 
-// This defines the number of system timer ticks per second.
-
 #define SYSTEM_TIMER_TICKS_PER_SECOND  100L
 
-//********************************************************************
-//
-// !!! ATA controller hardware specific data
-//
-//********************************************************************
+// ATA controller hardware specific data
 
-// ATA Command Block base address
-// (the address of the ATA Data register)
+// ATA Command Block base address (address of ATA Data register)
 #define PIO_BASE_ADDR1 0x01f0
 
-// ATA Control Block base address
-// (the address of the ATA DevCtrl
-//  and AltStatus registers)
+// ATA Control Block base address (address of DevCtrl and AltStatus registers)
 #define PIO_BASE_ADDR2 0x03f6
 
-// BMIDE base address (address of
-// the BMIDE Command register for
-// the Primary or Secondary side of
-// the PCI ATA controller)
+// BMIDE base address (address of the BMIDE Command register for
+//  the Primary or Secondary side of the PCI ATA controller)
 extern unsigned int pio_bmide_base_addr;
+
 //#define PIO_BMIDE_BASE_ADDR ( (unsigned char *) 0xc100 )
 
 // Size of the ATA Data register - allowed values are 8, 16 and 32
@@ -98,12 +54,6 @@ extern unsigned int pio_bmide_base_addr;
 
 // Command time out in seconds
 #define TMR_TIME_OUT 20
-
-//**************************************************************
-//
-// Data that MINDRVR makes available.
-//
-//**************************************************************
 
 // public interrupt handler data
 
@@ -157,6 +107,251 @@ struct REG_CMD_INFO
 } ;
 
 extern struct REG_CMD_INFO reg_cmd_info;
+
+
+// 512 bytes returned by IDENTIFY_DEVICE packet
+#define bits unsigned short
+#define bool unsigned short
+
+typedef struct _IDENTIFY_DEVICE_DATA {
+  struct {
+    bool                        __Reserved1        : 1;
+    bool                        __Retired3         : 1;
+    bool ResponseIncomplete                        : 1;
+    bits                        __Retired2         : 3;
+    bool FixedDevice                               : 1;
+    bool RemovableMedia                            : 1;
+
+    bits                        __Retired1         : 7;
+    bool DeviceType                                : 1;
+  } GeneralConfiguration;
+
+  u16    NumCylinders;
+  u16                           __ReservedWord2;
+
+  u16    NumHeads;
+  u16                           __Retired1[2];
+
+  u16    NumSectorsPerTrack;
+
+  u16    VendorUnique1[3];
+  char   SerialNumber[20];
+  u16                           __Retired2[2];
+  u16                           __Obsolete1;
+  char   FirmwareRevision[8];
+  char   ModelNumber[40];
+
+  u8     MaximumBlockTransfer;
+
+  u8     VendorUnique2;
+  u16                           __ReservedWord48;
+
+  struct {
+    bits                        __ReservedByte49   : 8;
+    bool DmaSupported                              : 1;
+    bool LbaSupported                              : 1;
+    bool IordyDisable                              : 1;
+    bool IordySupported                            : 1;
+    bool                        __Reserved1        : 1;
+    bool StandybyTimerSupport                      : 1;
+    bits                        __Reserved2        : 2;
+    bits                        __ReservedWord50   : 16;
+  } Capabilities;
+
+  u16                           __ObsoleteWords51[2];
+
+  bits   TranslationFieldsValid                    : 3;
+  bits                          __Reserved3        : 13;
+
+  u16    NumberOfCurrentCylinders;
+  u16    NumberOfCurrentHeads;
+  u16    CurrentSectorsPerTrack;
+  u32    CurrentSectorCapacity;
+  u8     CurrentMultiSectorSetting;
+
+  bool   MultiSectorSettingValid                   : 1;
+  bits                          __ReservedByte59   : 7;
+
+  u32    UserAddressableSectors;
+  u16                           __ObsoleteWord62;
+
+  bits   MultiWordDMASupport                       : 8;
+  bits   MultiWordDMAActive                        : 8;
+  bits   AdvancedPIOModes                          : 8;
+  bits                          __ReservedByte64   : 8;
+
+  u16    MinimumMWXferCycleTime;
+  u16    RecommendedMWXferCycleTime;
+  u16    MinimumPIOCycleTime;
+  u16    MinimumPIOCycleTimeIORDY;
+  u16                           __ReservedWords69[6];
+  bits   QueueDepth                                : 5;
+  bits                          __ReservedWord75   : 11;
+  u16                           __ReservedWords76[4];
+  u16    MajorRevision;
+  u16    MinorRevision;
+  struct {
+    bool SmartCommands                             : 1;
+    bool SecurityMode                              : 1;
+    bool RemovableMediaFeature                     : 1;
+    bool PowerManagement                           : 1;
+    bool                        __Reserved1        : 1;
+    bool WriteCache                                : 1;
+    bool LookAhead                                 : 1;
+    bool ReleaseInterrupt                          : 1;
+
+    bool ServiceInterrupt                          : 1;
+    bool DeviceReset                               : 1;
+    bool HostProtectedArea                         : 1;
+    bool                        __Obsolete1        : 1;
+    bool WriteBuffer                               : 1;
+    bool ReadBuffer                                : 1;
+    bool Nop                                       : 1;
+    bool                        __Obsolete2        : 1;
+
+    bool DownloadMicrocode                         : 1;
+    bool DmaQueued                                 : 1;
+    bool Cfa                                       : 1;
+    bool AdvancedPm                                : 1;
+    bool Msn                                       : 1;
+    bool PowerUpInStandby                          : 1;
+    bool ManualPowerUp                             : 1;
+    bool                        __Reserved2        : 1;
+
+    bool SetMax                                    : 1;
+    bool Acoustics                                 : 1;
+    bool BigLba                                    : 1;
+    bool DeviceConfigOverlay                       : 1;
+    bool FlushCache                                : 1;
+    bool FlushCacheExt                             : 1;
+    bits                        __Reserved3        : 2;
+
+    bool SmartErrorLog                             : 1;
+    bool SmartSelfTest                             : 1;
+    bool MediaSerialNumber                         : 1;
+    bool MediaCardPassThrough                      : 1;
+    bool StreamingFeature                          : 1;
+    bool GpLogging                                 : 1;
+    bool WriteFua                                  : 1;
+    bool WriteQueuedFua                            : 1;
+
+    bool WWN64Bit                                  : 1;
+    bool URGReadStream                             : 1;
+    bool URGWriteStream                            : 1;
+    bits ReservedForTechReport                     : 2;
+    bool IdleWithUnloadFeature                     : 1;
+    bits                        __Reserved4        : 2;
+  } CommandSetSupport, CommandSetActive;
+
+  bits   UltraDMASupport                           : 8;
+  bits   UltraDMAActive                            : 8;
+
+  u16                           __ReservedWord89[4];
+  u16    HardwareResetResult;
+
+  bits   CurrentAcousticValue                      : 8;
+  bits   RecommendedAcousticValue                  : 8;
+
+  u16                           __ReservedWord95[5];
+  u32    Max48BitLBA[2];
+  u16    StreamingTransferTime;
+  u16                           __ReservedWord105;
+
+  struct {
+    bits LogicalSectorsPerPhysicalSector           : 4;
+    bits                        __Reserved0        : 8;
+    bool LogicalSectorLongerThan256Words           : 1;
+    bool MultipleLogicalSectorsPerPhysicalSector   : 1;
+    bits                        __Reserved1        : 2;
+  } PhysicalLogicalSectorSize;
+
+  u16    InterSeekDelay;
+  u16    WorldWideName[4];
+  u16    ReservedForWorldWideName128[4];
+  u16    ReservedForTlcTechnicalReport;
+  u16    WordsPerLogicalSector[2];
+
+  struct {
+    bool ReservedForDrqTechnicalReport             : 1;
+    bool WriteReadVerifySupported                  : 1;
+    bits                        __Reserved01       : 11;
+    bits                        __Reserved1        : 2;
+  } CommandSetSupportExt, CommandSetActiveExt;
+
+  u16    ReservedForExpandedSupportandActive[6];
+
+  u16    MsnSupport                                : 2;
+  u16                           __ReservedWord1274 : 14;
+
+  struct {
+    bool SecuritySupported                         : 1;
+    bool SecurityEnabled                           : 1;
+    bool SecurityLocked                            : 1;
+    bool SecurityFrozen                            : 1;
+    bool SecurityCountExpired                      : 1;
+    bool EnhancedSecurityEraseSupported            : 1;
+    bits                        __Reserved0        : 2;
+
+    bool SecurityLevel                             : 1;
+    bits                        __Reserved1        : 7;
+  } SecurityStatus;
+
+  u16                           __ReservedWord129[31];
+
+  struct {
+    bits MaximumCurrentInMA2                       : 12;
+    bool CfaPowerMode1Disabled                     : 1;
+    bool CfaPowerMode1Required                     : 1;
+    bool                        __Reserved0        : 1;
+    bool Word160Supported                          : 1;
+  } CfaPowerModel;
+
+  u16 ReservedForCfaWord161[8];
+
+  struct {
+    bool SupportsTrim                              : 1;
+    bits                        __Reserved0        : 15;
+  } DataSetManagementFeature;
+
+  u16    ReservedForCfaWord170[6];
+
+  u16    CurrentMediaSerialNumber[30];
+  u16                           __ReservedWord206;
+  u16                           __ReservedWord207[2];
+
+  struct {
+    bits AlignmentOfLogicalWithinPhysical          : 14;
+    bool Word209Supported                          : 1;
+    bits                        __Reserved0        : 1;
+  } BlockAlignment;
+
+  u16    WriteReadVerifySectorCountMode3Only[2];
+  u16    WriteReadVerifySectorCountMode2Only[2];
+
+  struct {
+    bool NVCachePowerModeEnabled                   : 1;
+    bits                        __Reserved0        : 3;
+    bool NVCacheFeatureSetEnabled                  : 1;
+    bits                        __Reserved1        : 3;
+
+    bits NVCachePowerModeVersion                   : 4;
+    bits NVCacheFeatureSetVersion                  : 4;
+  } NVCacheCapabilities;
+
+  u16    NVCacheSizeLSW;
+  u16    NVCacheSizeMSW;
+  u16    NominalMediaRotationRate;
+  u16                           __ReservedWord218;
+
+  struct {
+    u8   NVCacheEstimatedTimeToSpinUpInSeconds;
+    u8                          __Reserved;
+  } NVCacheOptions;
+
+  u16                           __ReservedWord220[35];
+  bits   Signature  : 8;
+  bits   CheckSum   : 8;
+} IDENTIFY_DEVICE_DATA;
 
 // Configuration data for device 0 and 1
 // returned by the reg_config() function.

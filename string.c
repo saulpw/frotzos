@@ -64,12 +64,6 @@ char *strcpy(char * dest, const char * src)
     return ret;
 }
 
-char *strdup(const char *src)
-{
-    char *dest = (char*) malloc(strlen(src) + 1);
-    strcpy(dest, src);
-    return dest;
-}
 void *memmove(void *dest, const void *src, size_t n)
 {
     unsigned char *pd = dest;

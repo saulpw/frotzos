@@ -10,7 +10,7 @@ extern exception_handler, irq_handler, syscall_handler
 
 exc_handler_ptr dd exception_handler
 irq_handler_ptr dd irq_handler
-sys_handler_ptr dd syscall_handler
+;sys_handler_ptr dd syscall_handler
 
 asm_halt:
     hlt
@@ -70,6 +70,7 @@ master_irq_end:
     popad
     iret
 
+%if 0
 global syscall_stage0_start
 syscall_stage0_start:
     mov eax, esp
@@ -83,4 +84,4 @@ syscall_stage0_fixup:
     add esp, 4                 ; drop u32* parms
     iret
 syscall_stage0_end equ $
-
+%endif

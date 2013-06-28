@@ -1,6 +1,16 @@
 #ifndef _X86_HARDWARE_H_
 #define _X86_HARDWARE_H_
 
+#include "sys/types.h"
+
+// in a exception handler
+struct registers {
+    u32 unused_eax, ecx, edx, ebx, esp, ebp, esi, edi;
+    u32 eax, eflags, eip, cs;
+};
+
+void dump_regs(const struct registers *regs);
+
 static inline void yield()
 {
     asm volatile ("hlt");

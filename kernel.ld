@@ -1,7 +1,7 @@
-ENTRY (appmain)
-STARTUP(appmain.o)
+ENTRY (kmain)
+STARTUP(kmain.o)
 
-. = 0x01000000;
+. = 0x008200;
 
 SECTIONS
 {

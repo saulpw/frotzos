@@ -8,8 +8,14 @@ void init_kernel();
 void kprintf(const char *fmt, ...);
 
 #ifndef DEBUG
-#define DEBUG(args...)
+#define DEBUG 0
 #endif
+
+// DPRINT(0, ...) always prints
+// DPRINT(1, ...) prints if DEBUG >= 1
+#define DPRINT(L, FMT, args...) do { \
+        if (DEBUG >= L) kprintf(FMT "\r\n", ##args); \
+    } while (0)
 
 // physical memory
 #define FIRST_PHYS_PAGE        0x200000
@@ -26,10 +32,13 @@ void kprintf(const char *fmt, ...);
 #define DISK1_MAP_ADDR       0xf0000000
 #define DISK1_MAP_ADDR_MAX   0xffbfffff
 
-#define PAGE_TABLES ((u32 *) 0xffc00000)
-#define PAGE_DIR    ((u32 *) 0xfffff000)
+static u32 * const PAGE_TABLES = ((u32 *) 0xffc00000);
+static u32 * const PAGE_DIR    = ((u32 *) 0xfffff000);
 
-void page_fault(u32 errcode);
+// does a copy from src to dest via page tables
+void init_pagetable();
+void *map(void *dest, const void *src, size_t length);
+void page_fault(u32 errcode, const struct registers *regs);
 
 // flush dirty pages to disk1
 int ksync();
@@ -39,5 +48,9 @@ int ksync();
 #define IDT_BASE ((void *) 0x1000)
 
 void setup_interrupts(void *idtaddr);
+
+void setup_hdd();
+
+void init_syscalls();
 
 #endif

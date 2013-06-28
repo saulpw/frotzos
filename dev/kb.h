@@ -26,7 +26,7 @@ enum {
 // otherwise returns key:
 //    ascii if < 127, mnemonic as above enum
 //    OR'ed with the pressed shift flags (above)
-int get_key();
+unsigned int get_key();
 
 // scancodes for shift keys from get_scancode()
 #define ALT    0x38
@@ -34,7 +34,7 @@ int get_key();
 #define LSHIFT 0x2a
 #define RSHIFT 0x36
 
-int get_scancode();
+unsigned int get_scancode();
 
 void isr_keyboard();
 

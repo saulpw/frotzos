@@ -1,16 +1,17 @@
+#include <assert.h>
 #include <string.h>
 #include <stdio.h>
-#include "elifs.h"
+#include "iso9660.h"
 #include "kernel.h"
 
 FILE *fopen(const char *path, const char *mode)
 {
-    const struct fz_filehdr *h = NULL;
+    DiskFile *h = NULL;
 
     if (mode[0] == 'r') {
-        h = elifs_read(path);
+        h = iso9660_fopen_r(path);
         if (h == NULL) {
-            DEBUG("fopen(): no existing file '%s'", path);
+            kprintf("fopen(): no existing file '%s'\r\n", path);
             return NULL;
         }
     } else {
@@ -24,12 +25,11 @@ FILE *fopen(const char *path, const char *mode)
         // errno = ENOMEM;
         return NULL;
     }
-
-    fp->hdr = (struct fz_filehdr *) h;
+    fp->hdr = h;
     fp->fpos = 0;
 
     if (h) { // file for reading
-        fp->data = elif_data(h);
+        fp->data = (void *) h->data;
     } else {
 
         fp->datalen = 256;
@@ -42,6 +42,7 @@ FILE *fopen(const char *path, const char *mode)
 
 int fclose(FILE *fp)
 {
+#if 0
     if (fp->path != NULL) {
         if (elifs_write(fp->path, fp->data, fp->actualsize) == NULL) {
             return EOF;
@@ -49,6 +50,7 @@ int fclose(FILE *fp)
         free(fp->data);
         free(fp->path);
     }
+#endif
     free(fp);
     return 0;
 }
@@ -110,7 +112,7 @@ int ftell(FILE *fp)
 size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     int n = size*nmemb;
-    DEBUG("fread(void *0x%08X, %d, FILE *0x%08X)", ptr, n, stream->hdr);
+    DPRINT(1, "fread(void *0x%08X, %d, FILE *0x%08X)", ptr, n, stream->hdr);
     if (stream->fpos + n > stream->hdr->length)
     {
         n = stream->hdr->length - stream->fpos;
@@ -123,12 +125,12 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     if (stream->path == NULL) {
-        DEBUG("file not open for writing");
+        DPRINT(0, "file not open for writing");
         return 0;
     }
 
     size_t n = size*nmemb;
-//    DEBUG("fwrite(void *0x%08X, %u, FILE *0x%08X)\r\n", ptr, n, stream);
+    DPRINT(1, "fwrite(void *0x%08X, %u, FILE *0x%08X)", ptr, n, stream);
 
     while (stream->fpos + n > stream->datalen) {
         stream->datalen *= 2;

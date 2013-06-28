@@ -24,13 +24,38 @@ void irq_handler(u32 irq)
     };
 }
 
+void
+dump_regs(const struct registers *regs)
+{
+    DPRINT(0, "eax=%08X  ebx=%08X  ecx=%08X  edx=%08X",
+              regs->eax, regs->ebx, regs->ecx, regs->edx);
+    DPRINT(0, "esi=%08X  edi=%08X  ebp=%08X  esp=%08X",
+              regs->esi, regs->edi, regs->ebp, regs->esp);
+    DPRINT(0, "eflags=%08X  CS:EIP=%02X:%08X",
+              regs->eflags, regs->cs, regs->eip);
+
+
+    void **ebp = (void **) regs->ebp;
+
+    DPRINT(0, "[%08X] %eip=%08X", ebp, ebp[-1]);
+    ebp = (void **) ebp[1]; // why do we need to skip a frame like this??
+
+    while ((u32) ebp > 0x1000 && (u32) ebp < 0x7000)
+    {
+        DPRINT(0, "[%08X] %eip=%08X", ebp, ebp[1]);
+        ebp = (void **) ebp[0];
+    }
+}
+
 void exception_handler(u32 exc, u32 errcode,
                u32 edi, u32 esi, u32 ebp, u32 esp,
                u32 ebx, u32 edx, u32 ecx, u32 new_eax,
                u32 eax, u32 eip, u32 cs, u32 eflags)
 {
+    struct registers *regs = (struct registers *) &errcode;
+
     switch (exc) {
-        case 14: page_fault(errcode); break;
+        case 14: page_fault(errcode, regs); break;
 
         case 0:  // divide-by-zero
         case 1:  // debug
@@ -51,6 +76,7 @@ void exception_handler(u32 exc, u32 errcode,
         case 18: // machine check
         case 19: // simd fpe
         default:
+            dump_regs(regs);
             kprintf("Unhandled exception %d at EIP=%08X  ESP=%08X  EBP=%08X\r\n", exc, eip, esp, ebp);
             halt();
     };
@@ -128,10 +154,12 @@ create_idt(u32 *idt) // and also stage0 interrupt stubs after the IDT
         }
         else // syscall
         {
+#if 0
             create_handler(handler_addr, &syscall_stage0_start,
                                          &syscall_stage0_fixup,
                                          &syscall_stage0_end,
                                          i - 0x30);
+#endif
         }
         handler_addr += MAX_S0_LEN;
     }
