@@ -2,7 +2,7 @@
 #include <string.h>
 #include "x86.h"
 #include "kernel.h"
-#include "dev/ata.h"
+#include "ata/ata.h"
 
 static inline u32
 get_cr2()
@@ -109,16 +109,8 @@ page_fault(u32 errcode, const struct registers *regs)
 //        if (*boot_drive == 0x80) {
             int i=0;
             for (i=0; i < 8; ++i) {
-                int rc = reg_pio_data_in_lba28(disknum   // device
-                                , CMD_READ_SECTORS
-                                , 0        // feature
-                                , 1        // sectorCount
-                                , lba+i    // LBA
-                                , pageaddr + i*512 // bufAddr
-                                , 1        // numSect
-                                , 0        // multicnt
-                             );
-                if (rc != 0) {
+                if (ata_read_lba28(&disks[disknum], pageaddr + i*512, lba+i))
+                {
                     DPRINT(0, "unable to read LBA %d from disk%d (0x%08X)", lba, disknum, pageaddr);
                     if (i == 0) {
                         halt();
@@ -152,7 +144,7 @@ write_sector(const void *ptr)
     void *src = (void *) (((uint32_t) ptr) & 0xfffffe00);
 
     DPRINT(1, "writing sector %u from 0x%x", lba, src);
-
+#if 0
     int rc = reg_pio_data_out_lba28(1    // writable device
                                   , CMD_WRITE_SECTORS
                                   , 0    // feature
@@ -166,6 +158,7 @@ write_sector(const void *ptr)
         kprintf("unable to write sector to disk");
         return -1;
     }
+#endif
     return 0;
 }
 
@@ -182,7 +175,7 @@ write_page(u32 ptr)
     int lba = diskoffset >> 9;
 
     DPRINT(0, "writing page at lba %u from 0x%x", lba, src);
-
+#if 0
     int rc = reg_pio_data_out_lba28(1    // writable device
                                   , CMD_WRITE_SECTORS
                                   , 0    // feature
@@ -196,6 +189,7 @@ write_page(u32 ptr)
         kprintf("unable to write page to disk");
         return -1;
     }
+#endif
     return 0;
 }
 
