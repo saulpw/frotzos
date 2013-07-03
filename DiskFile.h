@@ -9,4 +9,8 @@ typedef struct DiskFile {
     uint64_t length;
 } DiskFile;
 
+DiskFile * iso9660_enumfiles();
+DiskFile * iso9660_fopen_r(const char *filename);
+DiskFile * iso9660_fopen_w(const char *filename);
+
 #endif

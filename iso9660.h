@@ -2,8 +2,6 @@
 #define ISO9660_H_
 
 #include <stdint.h>
-#include "DiskFile.h"
-#include "x86.h"
 
 typedef uint8_t u8;
 typedef uint16_t u16;
@@ -87,10 +85,5 @@ typedef struct PrimaryVolumeDescriptor {
 	u8 application_data[512];
 	u8 __unused5;
 } PrimaryVolumeDescriptor;
-DiskFile * iso9660_enumfiles();
-DiskFile * iso9660_fopen_r(const char *filename);
-DiskFile * iso9660_fopen_w(const char *filename);
-
-DONT_EMIT const void * iso9660_file_data(const DiskFile *df) { return df->data; }
 
 #endif

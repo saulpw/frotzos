@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
-#include "iso9660.h"
+#include "DiskFile.h"
 #include "kernel.h"
 
 FILE *fopen(const char *path, const char *mode)

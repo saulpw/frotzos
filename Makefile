@@ -80,7 +80,7 @@ ZCODE_FILES = $(wildcard zcode/*.z*)
 IMAGE_FILES += $(patsubst %.z5,%.iso,$(ZCODE_FILES))
 IMAGE_FILES += $(patsubst %.z8,%.iso,$(ZCODE_FILES))
 
-all: frotz.bin frotz.elf kernel.bin LostPig.iso 
+all: frotz.bin frotz.elf kernel.bin LostPig.iso.zip
 # $(IMAGE_FILES)
 
 $(FROTZLIB):
@@ -144,6 +144,12 @@ LostPig.iso: LostPig.z8 bootkernel.bin isoboot.bin frotz.bin
 
 .c.o:
 	gcc -c $(CFLAGS) -o $@ $<
+
+tools/iso2zip: tools/iso2zip.c
+	gcc -o $@ $<
+
+%.iso.zip: %.iso tools/iso2zip
+	./tools/iso2zip $<
 
 
 clean:
