@@ -86,4 +86,19 @@ typedef struct PrimaryVolumeDescriptor {
 	u8 __unused5;
 } PrimaryVolumeDescriptor;
 
+typedef struct PathTableEntry {
+    u8 id_len;
+    u8 ear_length;
+    u32 dir_sector;
+    u16 parent_dir_num;
+    char id[];
+    // and then a padding byte if id_len is odd
+} PathTableEntry;
+
+#define NEXT_PATH_TABLE_ENTRY(E) \
+    ((PathTableEntry *) (((u8 *) E) + sizeof(PathTableEntry) + E->id_len + (E->id_len & 0x1)))
+
+#define NEXT_DIR_ENTRY(E) \
+    ((DirectoryRecord *) (((u8 *) E) + E->record_len))
+
 #endif

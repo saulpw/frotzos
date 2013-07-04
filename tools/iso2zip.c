@@ -126,15 +126,13 @@ create_zip_hdrs(ZipLocalFileHeader **out_lhdr, int *out_lhdr_len,
 }
 
 #define SECTOR(N) (isoptr + (N) * SECTOR_SIZE)
-#define NEXT_ENTRY(E) \
-    ((const DirectoryRecord *) (((const u8 *) E) + E->record_len))
 
 const DirectoryRecord *find_file_at_sector(void *isoptr, int sector_num)
 {
     const PrimaryVolumeDescriptor *pvd = SECTOR(16);
     const DirectoryRecord *rootrecord =  &pvd->root_directory_record;
     const DirectoryRecord *entry = SECTOR(rootrecord->data_sector);
-    for (; entry->record_len != 0; entry = NEXT_ENTRY(entry))
+    for (; entry->record_len != 0; entry = NEXT_DIR_ENTRY(entry))
     {
         int start = entry->data_sector;
         int end = entry->data_sector + entry->data_len / SECTOR_SIZE;
@@ -146,6 +144,13 @@ const DirectoryRecord *find_file_at_sector(void *isoptr, int sector_num)
     }
     return NULL;
 }
+
+// for local file header
+struct added_sector
+{
+    u8 data[SECTOR_SIZE];
+    int sector_lba; // inserted just before this LBA in the original ISO
+};
 
 int
 main(int argc, char **argv)
@@ -176,17 +181,19 @@ main(int argc, char **argv)
         exit(-1);
     }
 
-    const PrimaryVolumeDescriptor *pvd = SECTOR(16);
+    PrimaryVolumeDescriptor *pvd = SECTOR(16);
     printf("# sectors=%d\n", pvd->num_sectors);
     const DirectoryRecord *rootrecord =  &pvd->root_directory_record;
     assert(rootrecord->record_len == sizeof(DirectoryRecord) + rootrecord->id_len);
 
     ZipCentralDirFileHeader *cdir_entries[256] = { NULL };
+    struct added_sector *add_sectors[256] = { NULL };
+    int ninserts = 0;
     int num_files = 0;
 
-    const DirectoryRecord *entry = SECTOR(rootrecord->data_sector);
+    DirectoryRecord *entry = NULL;
 
-    for (; entry->record_len > 0; entry = NEXT_ENTRY(entry))
+    for (entry = SECTOR(rootrecord->data_sector); entry->record_len > 0; entry = NEXT_DIR_ENTRY(entry))
     {
         char fn[256] = { 0 };
         strncpy(fn, entry->id, entry->id_len);
@@ -225,58 +232,96 @@ main(int argc, char **argv)
         uint32_t crc = crc32( SECTOR(entry->data_sector), entry->data_len);
 
         cdir_entries[num_files]->crc32 = local_hdr->crc32 = crc;
+        void *iso_ziplhdr = NULL;
+        size_t lhdr_fpos = 0;
 
         if (leftover >= localhdr_len) {
-            void *lhdr = SECTOR(entry->data_sector) - localhdr_len;
-            memcpy(lhdr, local_hdr, localhdr_len);
-            size_t lhdr_fpos = (entry->data_sector) * SECTOR_SIZE - localhdr_len;
-            cdir_entries[num_files]->local_header_ofs = lhdr_fpos;
-            num_files++;
+            iso_ziplhdr = SECTOR(entry->data_sector) - localhdr_len;
+            lhdr_fpos = (entry->data_sector + ninserts) * SECTOR_SIZE - localhdr_len;
         } else {
+            struct added_sector *newsect = (struct added_sector *) malloc(sizeof(struct added_sector));
+            // bzero(newsect->data, SECTOR_SIZE)?
+            newsect->sector_lba = entry->data_sector;
 
-            // need to insert 
-            printf("not putting %s in .zip due to not enough leftover space in previous file (%d/%d)\n", fn, leftover, localhdr_len);
+            iso_ziplhdr = newsect->data + SECTOR_SIZE - localhdr_len;
+            lhdr_fpos = (entry->data_sector + ninserts + 1) * SECTOR_SIZE - localhdr_len;
+
+            printf("inserting zip local file header for %s at sector %d\n",
+                        fn, newsect->sector_lba);
+
+            add_sectors[ninserts++] = newsect;
+
+//            printf("not putting %s in .zip due to not enough leftover space in previous file (%d/%d)\n", fn, leftover, localhdr_len);
         }
 
+        memcpy(iso_ziplhdr, local_hdr, localhdr_len);
+        cdir_entries[num_files]->local_header_ofs = lhdr_fpos;
+        num_files++;
 /* 
-        // for local file header
-        struct added_sector {
-
-        };
- //        note when writing, before the to add a sector
-            prepend_sectors_at[num_added_sectors++] = entry->data_sector;
-
- //        increase by 1 the LBA for anything after this sector (in the mmap)
-                      
-            actually, if leftover of file ending in previous sector is < this
-            
                 for each entry in the LSB path table
                     if location of extent >= this file's starting sector,
                         increment
 
                 for each entry in the MSB path table
                     same, but don't forget to BSWAP
-
-                for each entry in the root directory,
-                    bump LBA extent in both LSB and MSB if >= as above
-
-                // insert sector, adjust all tables
-                //
-        }
 */
     }
 
     assert (isosize % SECTOR_SIZE == 0);
 
-    int i=0;
-    while (i < isosize)
+    // for each inserted sector, bump the LBAs in directories and path tables.
+    int i;
+    for (i=0; add_sectors[i]; ++i)
     {
-        ssize_t r = write(fdout, isoptr + i, SECTOR_SIZE);
-        assert (r == SECTOR_SIZE);
-        i += r;
+        // for each entry in the root directory,
+        //     bump LBA extent +1 in both LSB and MSB if >= as above
+
+        for (entry = SECTOR(rootrecord->data_sector);
+                entry->record_len > 0; entry = NEXT_DIR_ENTRY(entry))
+        {
+            if (entry->data_sector >= add_sectors[i]->sector_lba)
+            {
+                entry->data_sector += 1;
+                // XXX: also bump entry->msb_data_sector
+            }
+        }
+        
+        PathTableEntry *lsb_path_table = SECTOR(pvd->lsb_path_table_sector);
+        int j;
+        for (j=0; j < pvd->path_table_size; ++j) {
+            if (lsb_path_table[j].dir_sector >= add_sectors[i]->sector_lba) {
+                lsb_path_table[j].dir_sector += 1;
+            }
+            lsb_path_table = NEXT_PATH_TABLE_ENTRY(lsb_path_table);
+        }
+//     PathTableEntry *msb_path_table = SECTOR(ntohl(pvd->msb_path_table_sector));
+
     }
 
-    int cdirpos = i;
+    pvd->num_sectors += ninserts;
+    // XXX: also msb_num_sectors;
+
+    int sector;
+    for (sector=0; sector * SECTOR_SIZE < isosize; ++sector)
+    {
+        ssize_t r;
+
+        int i;
+        for (i=0; add_sectors[i]; ++i) {
+            if (add_sectors[i]->sector_lba == sector)
+            {
+                r = write(fdout, add_sectors[i]->data, SECTOR_SIZE);
+                printf("inserted sector at %d\n", sector);
+                assert (r == SECTOR_SIZE);
+                break;
+            }
+        }            
+
+        r = write(fdout, isoptr + sector*SECTOR_SIZE, SECTOR_SIZE);
+        assert (r == SECTOR_SIZE);
+    }
+
+    int cdirpos = (sector + ninserts) * SECTOR_SIZE;
 
     // and now to write out the .zip central directory
     
