@@ -6,11 +6,7 @@
 #include "DiskFile.h"
 #include "iso9660.h"
 
-#define NEXT_ENTRY(E) \
-    ((const DirectoryRecord *) (((const u8 *) E) + E->record_len))
-
 DiskFile g_files[256];
-
 
 inline void *sector(unsigned int sectornum)
 {
@@ -37,7 +33,7 @@ DiskFile * iso9660_enumfiles()
         DPRINT(1, "CD file: %s at 0x%x (%u bytes)",
                     fp->filename, fp->data, fp->length);
 
-        entry = NEXT_ENTRY(entry);
+        entry = NEXT_DIR_ENTRY(entry);
     } while (entry->record_len > 0);
 
     g_files[i].filename[0] = 0;

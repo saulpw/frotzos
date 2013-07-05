@@ -4,6 +4,18 @@
 #include "sys/types.h"
 
 #define DONT_EMIT extern inline __attribute__ ((gnu_inline, always_inline))
+#define PACKED __attribute__((packed))
+
+#define HTONL(n) (((((unsigned long)(n) & 0xFF)) << 24) | \
+                  ((((unsigned long)(n) & 0xFF00)) << 8) | \
+                  ((((unsigned long)(n) & 0xFF0000)) >> 8) | \
+                  ((((unsigned long)(n) & 0xFF000000)) >> 24))
+
+#define NTOHL(n) (((((unsigned long)(n) & 0xFF)) << 24) | \
+                  ((((unsigned long)(n) & 0xFF00)) << 8) | \
+                  ((((unsigned long)(n) & 0xFF0000)) >> 8) | \
+                  ((((unsigned long)(n) & 0xFF000000)) >> 24))
+
 // x86 hardware I/O primitives
 
 // in a exception handler

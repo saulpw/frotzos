@@ -5,12 +5,16 @@ typedef struct
 {
     u16         base_port;
     u8          devnum;             // local to this controller, 0 or 1
+
+    u32         max_lba;
+    u32         sector_size;
+
     enum { 
         NONE=0, ATA, SATA, ATAPI, SATAPI, UNKNOWN
     }           type;
 } ata_disk;
 
-static const char *ata_types[] = { "NONE", "ATA", "SATA", "ATAPI", "SATAPI", "UNKNOWN" };
+static const char *ata_types[] = { "NONE", "ATA  ", "SATA ", "ATAPI", "SATAPI", "UNKNOWN" };
 
 extern ata_disk disks[];
 
@@ -18,7 +22,7 @@ extern ata_disk disks[];
 #define bits unsigned short
 #define bool unsigned short
 
-typedef struct _IDENTIFY_DEVICE_DATA {
+typedef struct PACKED _IDENTIFY_DEVICE_DATA {
   struct {
     bool                        __Reserved1        : 1;
     bool                        __Retired3         : 1;
@@ -259,7 +263,9 @@ typedef struct _IDENTIFY_DEVICE_DATA {
 } IDENTIFY_DEVICE_DATA;
 
 int init_ata();
-int ata_identify_device(const ata_disk *disk, IDENTIFY_DEVICE_DATA *id);
-int ata_read_lba28(const ata_disk *disk, u8 *buf, u32 lba);
+int ata_identify_device(ata_disk *disk, IDENTIFY_DEVICE_DATA *id);
+int ata_read_lba28(ata_disk *disk, u8 *buf, u16 buflen, u32 lba);
+int atapi_read_lba(ata_disk *d, u8 *buf, u16 buflen, u32 lba);
+int atapi_get_capacity(ata_disk *d);
 
 #endif
