@@ -1,23 +1,5 @@
 #ifndef SPOS_ATA_H_
 #define SPOS_ATA_H_
-
-typedef struct
-{
-    u16         base_port;
-    u8          devnum;             // local to this controller, 0 or 1
-
-    u32         max_lba;
-    u32         sector_size;
-
-    enum { 
-        NONE=0, ATA, SATA, ATAPI, SATAPI, UNKNOWN
-    }           type;
-} ata_disk;
-
-static const char *ata_types[] = { "NONE", "ATA  ", "SATA ", "ATAPI", "SATAPI", "UNKNOWN" };
-
-extern ata_disk disks[];
-
 // 512 bytes returned by IDENTIFY_DEVICE packet
 #define bits unsigned short
 #define bool unsigned short
@@ -261,6 +243,28 @@ typedef struct PACKED _IDENTIFY_DEVICE_DATA {
   bits   Signature  : 8;
   bits   CheckSum   : 8;
 } IDENTIFY_DEVICE_DATA;
+
+typedef enum { NONE=0, ATA, SATA, ATAPI, SATAPI, UNKNOWN } ata_type_t;
+
+typedef struct
+{
+    u16         base_port;
+    u8          devnum;             // local to this controller, 0 or 1
+
+    u32         max_lba;
+    u32         sector_size;
+
+    ata_type_t  type;
+
+    IDENTIFY_DEVICE_DATA id;
+
+} ata_disk;
+
+static const char *ata_types[] = { 
+    "NONE", "ATA  ", "SATA ", "ATAPI", "SATAPI", "UNKNOWN"
+};
+
+extern ata_disk disks[];
 
 int init_ata();
 int ata_identify_device(ata_disk *disk, IDENTIFY_DEVICE_DATA *id);

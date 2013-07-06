@@ -2,7 +2,7 @@
 #include <string.h>
 #include "x86.h"
 #include "kernel.h"
-#include "ata/ata.h"
+#include "dev/ata.h"
 
 static inline u32
 get_cr2()
@@ -44,9 +44,9 @@ page_fault(u32 errcode, const struct registers *regs)
         }
     }
 
-    DPRINT(2, "page fault at 0x%x", faultaddr);
+    DPRINT(3, "page fault at 0x%x", faultaddr);
     int disknum = -1;
-    int lba = 0;
+    int pagenum = -1;
 
     if ((errcode & 0x1) == 0x0) { // not present 
         // check for valid entry in PAGE_DIR
@@ -61,7 +61,7 @@ page_fault(u32 errcode, const struct registers *regs)
             if ((entry & 0x2) == 0x2) // on disk
             {
                 disknum = (entry >> 2) & 0x3;
-                lba = entry >> 4;
+                pagenum = entry >> 4;
             }
 
             // fill in page table entry with free page
@@ -71,74 +71,34 @@ page_fault(u32 errcode, const struct registers *regs)
 
     void *pageaddr = (void *) (faultaddr & 0xfffff000);
 
-#if 0
-    if (faultaddr >= DISK0_MAP_ADDR && faultaddr < DISK0_MAP_ADDR_MAX)
-    {
-        unsigned int diskoffset = faultaddr - DISK0_MAP_ADDR;
-        unsigned int pagenum = diskoffset >> 12;
-
-        disknum = 0;
-        lba = pagenum * 8;
-    }
-    else if (faultaddr >= DISK1_MAP_ADDR && faultaddr < DISK1_MAP_ADDR_MAX)
-    {
-        unsigned int diskoffset = faultaddr - DISK1_MAP_ADDR;
-        unsigned int pagenum = diskoffset >> 12;
-
-        lba = pagenum * 8;
-        disknum = 1;
-    }
-#endif
     if (disknum == -1) {
         memset(pageaddr, 0, 4096);
     } else {
-#ifdef ATA_DMA
-        int rc = dma_pci_lba28(disknum   // device
-                             , CMD_READ_DMA
-                             , 0        // feature
-                             , 8        // sectorCount
-                             , lba      // LBA
-                             , (void *) 0x10000  // pageaddr // bufAddr
-                             , 8        // numSect
-                             );
-
-        if (rc != 0) {
-            kprintf("unable to read 0x%08X from disk%d (LBA=%d)\r\n", pageaddr, disknum, lba);
+        if (hdd_read_page(disknum, pagenum, pageaddr)) {
+            kprintf("unable to read 0x%08X from disk%d (page#=%d)\r\n", pageaddr, disknum, pagenum);
+            halt();
         }
-#else
-//        if (*boot_drive == 0x80) {
-            int i=0;
-            for (i=0; i < 8; ++i) {
-                if (ata_read_lba28(&disks[disknum], pageaddr + i*512, lba+i))
-                {
-                    DPRINT(0, "unable to read LBA %d from disk%d (0x%08X)", lba, disknum, pageaddr);
-                    if (i == 0) {
-                        halt();
-                    }
-                }
-            }
-//        } else if (*boot_drive == 0xe0) {
-//        }
-#endif
+    }
 
+#if 0
         // after reading the page from disk, make the page read-only if
         //   it comes from disk0
 
         if (disknum == 0) {
-//            PAGE_TABLES[faultaddr >> 12] &= ~0x2; // not writable
+            PAGE_TABLES[faultaddr >> 12] &= ~0x2; // not writable
         }
-    }
+#endif
 }
 
 int
 write_sector(const void *ptr)
 {
-    if (ptr < (void *) DISK1_MAP_ADDR || ptr > (void *) DISK1_MAP_ADDR_MAX) {
+    if (ptr < (void *) SAVEDISK_ADDR || ptr > (void *) SAVEDISK_ADDR_MAX) {
         kprintf("ptr to write (0x%08X) not on disk1", ptr);
         return -1;
     }
 
-    uint32_t diskoffset = (uint32_t) ptr - DISK1_MAP_ADDR;
+    uint32_t diskoffset = (uint32_t) ptr - SAVEDISK_ADDR;
     int lba = diskoffset >> 9;
 
     void *src = (void *) (((uint32_t) ptr) & 0xfffffe00);
@@ -165,13 +125,13 @@ write_sector(const void *ptr)
 int
 write_page(u32 ptr)
 {
-    if (ptr < DISK1_MAP_ADDR || ptr > DISK1_MAP_ADDR_MAX) {
+    if (ptr < SAVEDISK_ADDR || ptr > SAVEDISK_ADDR_MAX) {
         kprintf("page to write (0x%08X) not on disk1", ptr);
         return -1;
     }
 
     void *src = (void *) (ptr & 0xfffff000);
-    uint32_t diskoffset = (uint32_t) src - DISK1_MAP_ADDR;
+    uint32_t diskoffset = (uint32_t) src - SAVEDISK_ADDR;
     int lba = diskoffset >> 9;
 
     DPRINT(0, "writing page at lba %u from 0x%x", lba, src);
@@ -204,8 +164,8 @@ int
 ksync()
 {
     int ret = 0;
-    u32 ptr = DISK1_MAP_ADDR;
-    for ( ; ptr < DISK1_MAP_ADDR_MAX; ptr += 4096)
+    u32 ptr = SAVEDISK_ADDR;
+    for ( ; ptr < SAVEDISK_ADDR_MAX; ptr += 4096)
     {
         if (is_dirty(ptr)) {
             DPRINT(1, "page at 0x%08X is dirty, writing to disk", ptr);
@@ -251,18 +211,22 @@ map(void *dest, const void *src, size_t len)
     return dest;
 }
 
+int
+map_disk(int disknum, unsigned long addr)
+{
+    const ata_disk *d = &disks[disknum];
+    int npages = disks[disknum].max_lba * disks[disknum].sector_size / 4096;
+    int i;
+    for (i=0; i < npages; ++i)
+    {
+        u32 val = (i << 4) | (disknum << 2) | 0x2; // not-present, on gamedisk
+        set_pt_entry(addr + i*4096, val); 
+    }
+    return 0;
+}
+
 void
 init_pagetable()
 {
-    size_t lba = 0;
-    size_t i=0;
-
-    u32 d = 0x10000000;
-    while (i < 0x400000)
-    {
-        u32 val = (lba << 4) | 0x2;  // not-present, on-disk, disk0
-        set_pt_entry(d + i, val); 
-        i += 4096;
-        lba += 4096 / 512;
-    }
 }
+

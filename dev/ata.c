@@ -34,7 +34,7 @@
 #define CB_DEV_HEAD_LBA  0x40
 
 #define CMD_PACKET                       0xA0
-#define CMD_READ_SECTORS                 0xA0
+#define CMD_READ_SECTORS                 0x20
 #define CMD_IDENTIFY_PACKET_DEVICE       0xA1
 #define CMD_IDENTIFY_DEVICE              0xEC
 
@@ -115,6 +115,8 @@ void ata_reset(ata_disk *d)
 
 int init_ata_dev(ata_disk *d)
 {
+    d->type = NONE;
+
     ata_out8(d, CB_DEV_CTRL, USE_DMA ? 0 : CB_DC_NIEN);
     ata_out8(d, CB_DEV_HEAD, d->devnum ? 0x10 : 0x00);
     DELAY400NS;
@@ -148,6 +150,13 @@ int init_ata_dev(ata_disk *d)
                 d->type = SATA;
             }
         }
+       
+        if (d->type != NONE) {
+            if (ata_identify_device(d, &d->id)) {
+                return 0;
+            }
+        }
+
         if (d->type != NONE) return 1;
     }
     return 0;
@@ -183,21 +192,8 @@ ata_error(const ata_disk *disk, const char *context)
 {
     u8 st = ata_in8(disk, CB_ALT_STATUS);
 
-    if (st & 0x01) { // ERR
-        u8 err = ata_in8(disk, CB_ERR);
-        assert(err);
-        if (err & 0xf0) DPRINT(0, "ATAPI Sense Key");
-        if (err & 0x80) DPRINT(0, "Bad Block");
-        if (err & 0x40) DPRINT(0, "Uncorrected");
-        if (err & 0x20) DPRINT(0, "Media Change");
-        if (err & 0x10) DPRINT(0, "ID Not Found");
-        if (err & 0x08) DPRINT(0, "Media Change Req");
-        if (err & 0x04) DPRINT(0, "Command Aborted");
-        if (err & 0x02) DPRINT(0, "No Track 0/End Of Media");
-        if (err & 0x01) DPRINT(0, "No Address Mark/Illegal Length");
-    }
-
-    DPRINT(0, "ata%04x:%d ERROR: %s STATUS= %02X (%s%s%s%s%s%s%s%s)",
+    DPRINT(0, "%s%04x:%d ERROR: %s STATUS= %02X (%s%s%s%s%s%s%s%s)",
+            ata_types[disk->type],
             disk->base_port, disk->devnum, context,
             st,
             (st & 0x80) ? "BUSY " : "",
@@ -215,6 +211,22 @@ ata_error(const ata_disk *disk, const char *context)
                 ata_in8(disk, CB_CYL_LOW),
                 ata_in8(disk, CB_CYL_HIGH),
                 ata_in8(disk, CB_DEV_HEAD));
+
+    if (st & 0x01) { // ERR
+        u8 err = ata_in8(disk, CB_ERR);
+        assert(err);
+        if ((err & 0xf0) == 0xf0) DPRINT(0, "   ERR: ATAPI Sense Key");
+        else {
+            if (err & 0x80) DPRINT(0, "   ERR: Bad Block");
+            if (err & 0x40) DPRINT(0, "   ERR: Uncorrected");
+            if (err & 0x20) DPRINT(0, "   ERR: Media Change");
+            if (err & 0x10) DPRINT(0, "   ERR: ID Not Found");
+        }
+        if (err & 0x08) DPRINT(0, "   ERR: Media Change Req");
+        if (err & 0x04) DPRINT(0, "   ERR: Command Aborted");
+        if (err & 0x02) DPRINT(0, "   ERR: No Track 0/End Of Media");
+        if (err & 0x01) DPRINT(0, "   ERR: No Address Mark/Illegal Length");
+    }
 }
 
 #define ALT_STATUS(D) ata_in8(D, CB_ALT_STATUS)
@@ -228,7 +240,7 @@ int ata_status_notbusy(ata_disk *d)
     {
         u8 status = ata_in8(d, CB_ALT_STATUS);
         if (status & CB_STATUS_ERR)
-            ata_error(d, "inner");
+            ata_error(d, "");
 
         if ((status & CB_STATUS_BUSY) == 0)
             return 0;
@@ -305,7 +317,6 @@ ata_identify_device(ata_disk *d, IDENTIFY_DEVICE_DATA *id)
     DELAY400NS;
 
     if (ata_status_notbusy(d)) {
-
         return -1; 
     }
 
@@ -324,11 +335,7 @@ ata_identify_device(ata_disk *d, IDENTIFY_DEVICE_DATA *id)
         return -1;
     }
 
-    if ((status & CB_STATUS_DRQ) == 0)
-    {
-        ata_error(d, "DRQ");
-        return -1;
-    }
+    assert(!DRQ);
 
     WORDSWAP(id->ModelNumber);
     WORDSWAP(id->SerialNumber);
@@ -338,7 +345,12 @@ ata_identify_device(ata_disk *d, IDENTIFY_DEVICE_DATA *id)
     d->sector_size = 512;
 
     if (d->type == ATAPI) {
-        if (atapi_get_capacity(d)) return -1;
+        if (atapi_get_capacity(d)) 
+        {
+            DPRINT(0, "get_capacity failed: No CD/DVD in drive");
+            d->type = NONE;
+            return -1;
+        }
     }
 
     DPRINT(0, "%s %x:%d maxLba=%u blocksize=%u",
@@ -364,7 +376,6 @@ int atapi_packet(ata_disk *d,
 
     u8 status = ata_in8(d, CB_STATUS);
     if (status & CB_STATUS_ERR) {
-        ata_error(d, "before sending atapi packet");
         return -1;
     }
     assert(DRQ);  // it wants us to send the inpkt
@@ -378,7 +389,6 @@ int atapi_packet(ata_disk *d,
     assert (!(status & CB_STATUS_BUSY));
 
     if (status & CB_STATUS_ERR) {
-        ata_error(d, "after sending atapi packet");
         return -1;
     }
 
@@ -387,7 +397,7 @@ int atapi_packet(ata_disk *d,
         u16 nbytes = (ata_in8(d, CB_LBA3) << 8) | ata_in8(d, CB_LBA2);
         assert(nbytes <= outbufsize);
         assert(nbytes > 0);
-        DPRINT(2, "atapi recving %d bytes", nbytes);
+        DPRINT(3, "atapi recving %d bytes", nbytes);
         ata_ins16(d, outbuf, nbytes);
 
         // BUG: receives into the same buffer until !DRQ
@@ -409,7 +419,6 @@ atapi_get_capacity(ata_disk *d)
 
     if (atapi_packet(d, (void *) atapi_cmd_pkt, sizeof(atapi_cmd_pkt), (void *) buf, sizeof(buf)))
     {
-        ata_error(d, "get capacity");
         return -1;
     }
 
@@ -422,30 +431,38 @@ atapi_get_capacity(ata_disk *d)
 int
 ata_read_lba28(ata_disk *d, u8 *buf, u16 buflen, u32 lba)
 {
+#if 0
     if (ata_select(d)) return -1;
 
     // sub_setup_command()
     ata_out8(d, CB_DEV_CTRL, USE_DMA ? 0 : CB_DC_NIEN);
-    ata_out8(d, CB_FEATURE, 0);
-    ata_out8(d, CB_SECTOR_CNT, 1);
-    ata_out8(d, CB_SECTOR_NUM, (u8) lba);
-    ata_out8(d, CB_CYL_LOW, (u8) (lba >> 8));
-    ata_out8(d, CB_CYL_HIGH, (u8) (lba >> 16));
 
     u8 dh = CB_DEV_HEAD_LBA | (d->devnum ? 0x10 : 0x00);
+//    u8 dh = 0xe0 | (d->devnum ? 0x10 : 0x00);
     ata_out8(d, CB_DEV_HEAD, (u8) ((dh & 0xf0) | ((lba >> 24) & 0x0f)));
+
+    ata_out8(d, CB_FEATURE, 0);
+    ata_out8(d, CB_SECTOR_CNT, 1);
+    ata_out8(d, CB_LBA1, (u8) lba);
+    ata_out8(d, CB_LBA2, (u8) (lba >> 8));
+    ata_out8(d, CB_LBA3, (u8) (lba >> 16));
+#else
+
+    if (ata_setup_command(d, 0, 1, lba, lba >> 8, lba >> 16)) return -1;
+#endif
 
     ata_out8(d, CB_CMD, CMD_READ_SECTORS);
     DELAY400NS;
 
     if (ata_status_notbusy(d)) {
-        ata_error(d, "preread");
         return -1; 
     }
 
     u8 status = ata_in8(d, CB_STATUS);
 
-    if ((status & (CB_STATUS_BUSY | CB_STATUS_DRQ)) == CB_STATUS_DRQ)
+    assert(DRQ);
+
+    if (status & CB_STATUS_DRQ)
     {
         ata_ins16(d, buf, buflen);
 
@@ -458,11 +475,8 @@ ata_read_lba28(ata_disk *d, u8 *buf, u16 buflen, u32 lba)
         return -1;
     }
 
-    if ((status & CB_STATUS_DRQ) == 0)
-    {
-        ata_error(d, "DRQ");
-        return -1;
-    }
+    assert(!DRQ);
+
 
     return 0;
 }

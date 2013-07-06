@@ -25,12 +25,12 @@ void kprintf(const char *fmt, ...);
 #define HEAP_ADDR_MAX          0xf00000
 
 // disk0 is read-only (3.5GB)
-#define DISK0_MAP_ADDR       0x10000000
-#define DISK0_MAP_ADDR_MAX   0xefffffff
+#define GAMEDISK_ADDR       0x10000000
+#define GAMEDISK_ADDR_MAX   0xefffffff
 
 // disk1 is writable (252MB)
-#define DISK1_MAP_ADDR       0xf0000000
-#define DISK1_MAP_ADDR_MAX   0xffbfffff
+#define SAVEDISK_ADDR       0xf0000000
+#define SAVEDISK_ADDR_MAX   0xffbfffff
 
 static u32 * const PAGE_TABLES = ((u32 *) 0xffc00000);
 static u32 * const PAGE_DIR    = ((u32 *) 0xfffff000);
@@ -50,6 +50,8 @@ int ksync();
 void setup_interrupts(void *idtaddr);
 
 void setup_hdd();
+int map_disk(int disknum, unsigned long addr);
+int hdd_read_page(int disknum, unsigned long pagenum, void *buf);
 
 void init_syscalls();
 

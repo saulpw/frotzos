@@ -37,12 +37,12 @@ dump_regs(const struct registers *regs)
 
     void **ebp = (void **) regs->ebp;
 
-    DPRINT(0, "[%08X] %eip=%08X", ebp, ebp[-1]);
+    DPRINT(0, "[%08X] eip=%08X", ebp, ebp[-1]);
     ebp = (void **) ebp[1]; // why do we need to skip a frame like this??
 
     while ((u32) ebp > 0x1000 && (u32) ebp < 0x7000)
     {
-        DPRINT(0, "[%08X] %eip=%08X", ebp, ebp[1]);
+        DPRINT(0, "[%08X] eip=%08X", ebp, ebp[1]);
         ebp = (void **) ebp[0];
     }
 }
