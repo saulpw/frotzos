@@ -31,10 +31,10 @@
 #define CB_STATUS_DRQ       0x08
 #define CB_STATUS_ERR       0x01
 
-#define CB_DEV_HEAD_LBA  0x40
+#define CB_DEV_HEAD_LBA     0x40
 
-#define CMD_PACKET                       0xA0
 #define CMD_READ_SECTORS                 0x20
+#define CMD_PACKET                       0xA0
 #define CMD_IDENTIFY_PACKET_DEVICE       0xA1
 #define CMD_IDENTIFY_DEVICE              0xEC
 
@@ -270,14 +270,14 @@ ata_setup_command(ata_disk *d, u8 fr, u8 sc, u8 sn, u8 cl, u8 ch)
 {
     if (ata_select(d)) return -1;
 
+    ata_out8(d, CB_DEV_HEAD, CB_DEV_HEAD_LBA | (d->devnum ? 0x10 : 0x00));
+
     ata_out8(d, CB_DEV_CTRL, USE_DMA ? 0 : CB_DC_NIEN);
     ata_out8(d, CB_FEATURE, fr);
     ata_out8(d, CB_SECTOR_CNT, sc);
     ata_out8(d, CB_SECTOR_NUM, sn);
     ata_out8(d, CB_CYL_LOW, cl);
     ata_out8(d, CB_CYL_HIGH, ch);
-//    ata_out8(d, CB_DEV_HEAD, CB_DEV_HEAD_LBA | (d->devnum ? 0x10 : 0x00));
-//       (should be handled by ata_select)
 
     DELAY400NS;
 
@@ -431,25 +431,7 @@ atapi_get_capacity(ata_disk *d)
 int
 ata_read_lba28(ata_disk *d, u8 *buf, u16 buflen, u32 lba)
 {
-#if 0
-    if (ata_select(d)) return -1;
-
-    // sub_setup_command()
-    ata_out8(d, CB_DEV_CTRL, USE_DMA ? 0 : CB_DC_NIEN);
-
-    u8 dh = CB_DEV_HEAD_LBA | (d->devnum ? 0x10 : 0x00);
-//    u8 dh = 0xe0 | (d->devnum ? 0x10 : 0x00);
-    ata_out8(d, CB_DEV_HEAD, (u8) ((dh & 0xf0) | ((lba >> 24) & 0x0f)));
-
-    ata_out8(d, CB_FEATURE, 0);
-    ata_out8(d, CB_SECTOR_CNT, 1);
-    ata_out8(d, CB_LBA1, (u8) lba);
-    ata_out8(d, CB_LBA2, (u8) (lba >> 8));
-    ata_out8(d, CB_LBA3, (u8) (lba >> 16));
-#else
-
     if (ata_setup_command(d, 0, 1, lba, lba >> 8, lba >> 16)) return -1;
-#endif
 
     ata_out8(d, CB_CMD, CMD_READ_SECTORS);
     DELAY400NS;
@@ -462,21 +444,16 @@ ata_read_lba28(ata_disk *d, u8 *buf, u16 buflen, u32 lba)
 
     assert(DRQ);
 
-    if (status & CB_STATUS_DRQ)
-    {
-        ata_ins16(d, buf, buflen);
-
-        DELAY400NS;
-    }
+    ata_ins16(d, buf, buflen);
 
     if (status & (CB_STATUS_BUSY | CB_STATUS_DEVFAULT | CB_STATUS_ERR))
     {
-        ata_error(d, "read error");
+        ata_error(d, "ata_read_lba28 error");
         return -1;
     }
 
+    DELAY400NS;
     assert(!DRQ);
-
 
     return 0;
 }
