@@ -18,7 +18,6 @@ DiskFile * iso9660_enumfiles()
 {
     const PrimaryVolumeDescriptor *pvd = sector(16);
 
-    pvd->num_sectors;
     const DirectoryRecord *rootrecord = &pvd->root_directory_record;
     assert(rootrecord->record_len == sizeof(DirectoryRecord) + rootrecord->id_len);
 

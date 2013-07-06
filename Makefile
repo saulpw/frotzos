@@ -1,4 +1,3 @@
-
 PUBL=PUBLISHER_ID
 PREP=PREPARER_ID
 SYSI=SYSTEM_ID
@@ -133,6 +132,7 @@ LostPig.iso: LostPig.z8 bootkernel.bin isoboot.bin frotz.bin
 		-boot-load-seg=0x7c0 \
 		-boot-load-size=1 \
 		-boot-info-table \
+		-sort fzos.sort \
 		-input-charset=iso8859-1 \
 		-o $@ isoboot.bin frotz.bin $<
 

@@ -239,6 +239,7 @@ main(int argc, char **argv)
             iso_ziplhdr = SECTOR(entry->data_sector) - localhdr_len;
             lhdr_fpos = (entry->data_sector + ninserts) * SECTOR_SIZE - localhdr_len;
         } else {
+#if 0
             struct added_sector *newsect = (struct added_sector *) malloc(sizeof(struct added_sector));
             // bzero(newsect->data, SECTOR_SIZE)?
             newsect->sector_lba = entry->data_sector;
@@ -251,7 +252,10 @@ main(int argc, char **argv)
 
             add_sectors[ninserts++] = newsect;
 
-//            printf("not putting %s in .zip due to not enough leftover space in previous file (%d/%d)\n", fn, leftover, localhdr_len);
+#else
+            printf("not putting %s in .zip due to not enough leftover space in previous file %s (%d bytes) (%d/%d)\n", fn, prev_file->id, prev_filesize, leftover, localhdr_len);
+            continue;
+#endif
         }
 
         memcpy(iso_ziplhdr, local_hdr, localhdr_len);
