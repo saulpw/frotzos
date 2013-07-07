@@ -137,6 +137,11 @@ const DirectoryRecord *find_file_at_sector(void *isoptr, int sector_num)
         int start = entry->data_sector;
         int end = entry->data_sector + entry->data_len / SECTOR_SIZE;
 
+        if (entry->data_len % SECTOR_SIZE == 0)
+            end -= 1;
+
+//        printf("[looking for %d] %s (%d bytes) at sectors %d-%d\n", sector_num, entry->id, entry->data_len, start, end);
+
         if (sector_num >= start && sector_num <= end)
         {
             return entry;
@@ -213,6 +218,11 @@ main(int argc, char **argv)
         }
 
         const DirectoryRecord *prev_file = find_file_at_sector(isoptr, entry->data_sector - 1);
+        if (prev_file == NULL) {
+            printf("skipping file, no previous file to put zip header\n");
+            continue;
+        }         
+                
         int prev_filesize = prev_file->data_len;
         int leftover = SECTOR_SIZE - (prev_filesize % SECTOR_SIZE);
 
