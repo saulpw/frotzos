@@ -27,7 +27,7 @@ inline zchar KeyToZchar(unsigned int k)
     };
 }
 
-int
+unsigned int
 read_key (int timeout, int show_cursor, int readline)
 {
     if (show_cursor)
@@ -38,8 +38,8 @@ read_key (int timeout, int show_cursor, int readline)
     int extended = FALSE;
 
     do {
-        int key = get_key();
-        if (key == -1) {
+        unsigned int key = get_key();
+        if (key == 0) {
             yield();
             continue;
         }
@@ -58,7 +58,7 @@ read_key (int timeout, int show_cursor, int readline)
         }
 
         if (key > 0) {
-            return key & 0xff;
+            return key & ~SHIFT_FLAG;
         }
     } while (timeout == 0 || seconds() < endseconds);
 
@@ -92,7 +92,7 @@ os_read_line(int max, zchar *buf, int timeout, int width, int continued)
                 remainingTime = 1;
             }
         }
-        int ch = read_key(remainingTime, TRUE, TRUE);
+        unsigned int ch = read_key(remainingTime, TRUE, TRUE);
 
         if (ch & ALT_FLAG) {
             switch (ch & 0xff) {
@@ -106,6 +106,15 @@ os_read_line(int max, zchar *buf, int timeout, int width, int continued)
                 case 'h': return ZC_HKEY_HELP;
                 default:  break;
             };
+        }
+
+        if ((ch & SHIFT_MASK) == CTRL_FLAG) {
+            ch &= 0xff;
+            if (ch >= 'a' && ch <= 'z') {
+                ch -= 'a' - 1;    // so ^a == 1
+            } else if (ch >= '[' && ch <= '_') {
+                ch -= '[' - 27;
+            }
         }
 
         switch (ch)

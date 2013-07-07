@@ -20,6 +20,7 @@ enum {
 #define CTRL_FLAG (1 << 8)
 #define ALT_FLAG (1 << 9)
 #define SHIFT_FLAG (1 << 10)
+#define SHIFT_MASK  (CTRL_FLAG | ALT_FLAG | SHIFT_FLAG)
 
 // returns -1 if no key has been pressed
 // returns 0 if no 'interesting' key has been pressed (

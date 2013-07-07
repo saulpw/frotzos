@@ -46,7 +46,7 @@ unsigned int
 get_scancode()
 {
     if (kqback == kqfront) { // queue is empty
-        return -1;
+        return 0;
     }
 
     unsigned char k = keyqueue[kqfront++];
@@ -63,8 +63,8 @@ get_key()
     while (1)
     {
         int scancode = get_scancode();
-        if (scancode == -1) {
-            return -1;
+        if (scancode == 0) {
+            return 0;
         } else if (scancode == 0xe0) {
             extended = 1;
             continue;
@@ -82,8 +82,8 @@ get_key()
         if (depressed[ALT]) shifts |= ALT_FLAG;
         if (depressed[LSHIFT] || depressed[RSHIFT]) shifts |= SHIFT_FLAG;
 
-        char ch = 0;
 
+        unsigned char ch = 0;
 
         if (extended) {
             switch (scancode) {
