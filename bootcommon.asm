@@ -35,8 +35,9 @@ enable_A20: ; from wiki.osdev.org
     mov al,0xAE
     out 0x64,al
 
-    call a20wait
-    ret
+;  fall-through
+;    call a20wait
+;    ret
 
 a20wait:
     in al,0x64
@@ -50,10 +51,14 @@ a20wait2:
     jz a20wait2
     ret
 
+; character to print in al
 putc:
     push ax
+    push bx
     mov ah, 0x0e
+    mov bx, 0x000f
     int 0x10
+    pop bx
     pop ax
     ret
 
@@ -61,9 +66,7 @@ writestr:
     lodsb
     test al, al
     jz end
-    mov ah, 0x0e
-    mov bx, 0x000f
-    int 0x10
+    call putc
     jmp writestr
 end:
     ret
