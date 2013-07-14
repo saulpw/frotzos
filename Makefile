@@ -11,7 +11,7 @@ BIBL=BIBLIOGRAPHIC_FILE
 FROTZDIR=frotz
 FROTZLIB=frotz_common.a
 
-BINS=bootloader.bin frotz.bin kernel.bin $(FROTZLIB)
+BINS=bootloader.bin frotz.bin kernel.bin isoboot.bin $(FROTZLIB)
 
 ARCHFLAGS= -ffreestanding -m32 -nostdlib -nostdinc -nostartfiles -nodefaultlibs -fno-strict-aliasing
 INCLUDES= -I$(FROTZDIR)/src/common -I.
@@ -52,12 +52,10 @@ FROTZ_OBJS := $(addprefix frotz/src/frotzos/, \
 		dev/serial.o      \
 
 
-
 KERNEL_OBJS := \
 		dev/ata.o         \
 		dev/serial.o      \
 		dev/time.o        \
-		dev/vgatext.o     \
 		hdd.o             \
 		int_stage0.o      \
 		interrupts.o      \
@@ -96,7 +94,7 @@ malloc.o: malloc.c
 	gcc -c $(CFLAGS) $(MALLOC_CFLAGS) -o $@ $<
 
 
-%.bin: %.asm
+%.bin: %.asm bootcommon.asm
 	nasm $(ASMFLAGS) -f bin -l $@.lst -o $@ $<
 
 bootkernel.bin: bootloader.bin kernel.bin
@@ -148,10 +146,10 @@ LostPig.iso: LostPig.z8 bootkernel.bin isoboot.bin frotz.bin
 tools/iso2zip: tools/iso2zip.c
 	gcc -o $@ $<
 
-%.iso.zip: %.iso tools/iso2zip
-	./tools/iso2zip $<
+%.izo: %.iso tools/iso2zip
+	./tools/iso2zip $< -o $@
 
 
 clean:
 	make -C $(FROTZDIR) clean
-	rm -f $(BINS) $(KERNEL_OBJS) $(FROTZ_OBJS) kmain.o appmain.o bootloader.bin.list *.map kernel.elf frotz.elf
+	rm -f $(BINS) $(KERNEL_OBJS) $(FROTZ_OBJS) kmain.o appmain.o *.map kernel.elf frotz.elf *.lst

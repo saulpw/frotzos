@@ -51,6 +51,7 @@ void setup_interrupts(void *idtaddr);
 
 void setup_hdd();
 int map_disk(int disknum, unsigned long addr);
+void map_phys(void *virtaddr, u32 physaddr, size_t len);
 int hdd_read_page(int disknum, unsigned long pagenum, void *buf);
 
 void init_syscalls();

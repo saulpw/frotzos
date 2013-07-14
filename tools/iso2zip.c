@@ -140,8 +140,6 @@ const DirectoryRecord *find_file_at_sector(void *isoptr, int sector_num)
         if (entry->data_len % SECTOR_SIZE == 0)
             end -= 1;
 
-//        printf("[looking for %d] %s (%d bytes) at sectors %d-%d\n", sector_num, entry->id, entry->data_len, start, end);
-
         if (sector_num >= start && sector_num <= end)
         {
             return entry;
@@ -165,17 +163,51 @@ main(int argc, char **argv)
     assert(sizeof(ZipCentralDirFileHeader) == 46);
     assert(sizeof(ZipEndCentralDirRecord) == 22);
 
-    char outfn[256];
-    snprintf(outfn, 256, "%s.zip", argv[1]);
+    const char *infn = NULL;
+    char outfn[256] = { 0 };
 
-    int fdiso = open(argv[1], O_RDONLY);
-    ERRNO(fdiso);
+    int fdiso, fdout;
 
-    int fdout = open(outfn, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-    ERRNO(fdout);
+    int opt;
+
+    while ((opt = getopt(argc, argv, "o:")) != -1) {
+        switch (opt) {
+        case 'o':
+            strcpy(outfn, optarg);
+            break;
+        default:
+            fprintf(stderr, "Usage: %s [-o <output-izo-name>] <input-iso>\n", 
+                    argv[0]);
+            exit(EXIT_FAILURE);
+        };
+    }
+
+    infn = argv[optind];
+
+    if (!outfn[0]) {
+        strcpy(outfn, infn);
+        char *ext = strrchr(outfn, '.');
+        *ext = 0;
+        strcat(ext, ".izo");
+    }
+
+    fprintf(stderr, "Converting ISO '%s' to IZO '%s'\n", infn, outfn);
+
+    if ((fdiso = open(infn, O_RDONLY)) < 0) {
+        perror(infn);
+        exit(EXIT_FAILURE);
+    }
+
+    if ((fdout = open(outfn, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR)) < 0) {
+        perror(outfn);
+        exit(EXIT_FAILURE);
+    }
 
     struct stat st;
-    ERRNO(fstat(fdiso, &st));
+    if (fstat(fdiso, &st) < 0) {
+        perror("fstat iso");
+        exit(EXIT_FAILURE);
+    }
 
     size_t isosize = st.st_size;
 
@@ -187,7 +219,7 @@ main(int argc, char **argv)
     }
 
     PrimaryVolumeDescriptor *pvd = SECTOR(16);
-    printf("# sectors=%d\n", pvd->num_sectors);
+//    printf("# sectors=%d\n", pvd->num_sectors);
     const DirectoryRecord *rootrecord =  &pvd->root_directory_record;
     assert(rootrecord->record_len == sizeof(DirectoryRecord) + rootrecord->id_len);
 
@@ -210,16 +242,16 @@ main(int argc, char **argv)
             fn[1] = '.';
         }
 
-        printf("CD file: %s at sector %d (%u bytes)\n",
-                fn, entry->data_sector, entry->data_len);
-
         if (fn[0] == '.') {
             continue;
         }
 
+        fprintf(stderr, "%s at ISO sector %d (%u bytes): ",
+                fn, entry->data_sector, entry->data_len);
+
         const DirectoryRecord *prev_file = find_file_at_sector(isoptr, entry->data_sector - 1);
         if (prev_file == NULL) {
-            printf("skipping file, no previous file to put zip header\n");
+            fprintf(stderr, "no previous file\n");
             continue;
         }         
                 
@@ -257,17 +289,18 @@ main(int argc, char **argv)
             iso_ziplhdr = newsect->data + SECTOR_SIZE - localhdr_len;
             lhdr_fpos = (entry->data_sector + ninserts + 1) * SECTOR_SIZE - localhdr_len;
 
-            printf("inserting zip local file header for %s at sector %d\n",
+            fprintf(stderr, "inserting zip local file header for %s at sector %d\n",
                         fn, newsect->sector_lba);
 
             add_sectors[ninserts++] = newsect;
 
 #else
-            printf("not putting %s in .zip due to not enough leftover space in previous file %s (%d bytes) (%d/%d)\n", fn, prev_file->id, prev_filesize, leftover, localhdr_len);
+            fprintf(stderr, "not enough leftover space in %s (size %d)\n", prev_file->id, prev_filesize);
             continue;
 #endif
         }
 
+        fprintf(stderr, "included in .zip\n");
         memcpy(iso_ziplhdr, local_hdr, localhdr_len);
         cdir_entries[num_files]->local_header_ofs = lhdr_fpos;
         num_files++;
@@ -325,7 +358,7 @@ main(int argc, char **argv)
             if (add_sectors[i]->sector_lba == sector)
             {
                 r = write(fdout, add_sectors[i]->data, SECTOR_SIZE);
-                printf("inserted sector at %d\n", sector);
+                fprintf(stderr, "inserted sector at %d\n", sector);
                 assert (r == SECTOR_SIZE);
                 break;
             }
@@ -360,6 +393,15 @@ main(int argc, char **argv)
 
     ssize_t r = write(fdout, &endcdir, sizeof(ZipEndCentralDirRecord));
     assert(r == sizeof(ZipEndCentralDirRecord));
+
+    int lastsectorlen = cdir_len + sizeof(ZipEndCentralDirRecord);
+    // pad to sector boundary
+    char paddingbuf[SECTOR_SIZE] = { 0 };
+    int padding = SECTOR_SIZE - (lastsectorlen % SECTOR_SIZE);
+    assert(lastsectorlen + padding == SECTOR_SIZE);
+    if (padding > 0) {
+        r = write(fdout, paddingbuf, padding);
+    }
 
     munmap(isoptr, isosize);
     close(fdiso);

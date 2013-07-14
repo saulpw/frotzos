@@ -2,36 +2,24 @@
 
 a return to the golden era of bootable games
 
-This builds a hard disk image that can be booted in a VM to run a .z5 program.
+This builds a .izo image that can be booted in a VM to run a .z5 program.
 
 ## Features
 
 * standalone image--only an x86 hypervisor required to play
-* instant boot
+* instantly boots directly into game
+* minimal extraneous code
 * no closed-source software except for game itself
-* original .z5 file easily identifiable and extractable
+* original z-code file easily identifiable and extractable via .zip
 
-## To build an image:
+## To use the resulting .izo
 
-1. get a .z5 file (I used random.z5 from the frotz tests)
-2. make random.img
-
-## To use the resulting image
-
-3. truncate --size=1MB savedisk.img
-4. qemu-system-i386 random.img -hdb savedisk.img
+1. (optional) truncate --size=1MB savedisk.img
+2. qemu-system-i386 -cdrom LostPig.izo [-hda savedisk.img]
 
 ## TODO/bugs:
 
-* make second hard disk not required to play (only to save)
-* ^U doesn't clear line anymore
 * lost pig color glitch on first scroll
 * os_read_line positioning bug after timeout/continuation
-* elifs_tool could act more like tar (-x, -c, -t)
 * extended characters (etude.z5/7)
-* interrupt driven ATA driver instead of PIO
-* beep/sound
 
-## Gotchas
-
-* raw image doesn't work in VMWare/VirtualBox; convert to vmdk first

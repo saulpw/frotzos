@@ -211,6 +211,17 @@ map(void *dest, const void *src, size_t len)
     return dest;
 }
 
+void
+map_phys(void *virtaddr, u32 physaddr, size_t len)
+{
+    size_t i;
+    for (i=0; i < len; i += 4096)
+    {
+        u32 val = (physaddr + i*4096) | 0x3;
+        set_pt_entry((u32) virtaddr + i*4096, val); 
+    }
+}
+
 int
 map_disk(int disknum, unsigned long addr)
 {
