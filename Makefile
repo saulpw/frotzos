@@ -11,7 +11,7 @@ BIBL=BIBLIOGRAPHIC_FILE
 FROTZDIR=frotz
 FROTZLIB=frotz_common.a
 
-BINS=bootloader.bin frotz.bin kernel.bin isoboot.bin $(FROTZLIB)
+BINS=bootloader.bin frotz.bin kernel.bin isoboot.bin $(FROTZLIB) tools/iso2zip
 
 ARCHFLAGS= -ffreestanding -m32 -nostdlib -nostdinc -nostartfiles -nodefaultlibs -fno-strict-aliasing
 INCLUDES= -I$(FROTZDIR)/src/common -I.
