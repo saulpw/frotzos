@@ -17,9 +17,3 @@ This builds a .izo image that can be booted in a VM to run a .z5 program.
 1. (optional) truncate --size=1MB savedisk.img
 2. qemu-system-i386 -cdrom LostPig.izo [-hda savedisk.img]
 
-## TODO/bugs:
-
-* lost pig color glitch on first scroll
-* os_read_line positioning bug after timeout/continuation
-* extended characters (etude.z5/7)
-
